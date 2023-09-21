@@ -23,23 +23,23 @@
 ### EDA REPORT
 - 26.5 % Of Customers Switched To Another Firm.
   
-![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/967c1774-da2a-47f6-a470-351727e68a07)
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/1.png)
 
 - Both Genders Behaved In Similar Fashion When It Comes To Migrating To Another Service Provider/Firm.
 
-![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/8e352f19-4a2b-4bf7-9145-fbeca5a303bb)
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/2.png)
 
 - About 75% Of Customer With Month-To-Month Contract Opted To Move Out As Compared To 13% Of Customers With One Year Contract And 3% With Two Year Contract.
 
-![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/3a2f1ab9-d0ed-4133-b79f-0b0e7d33216a)
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/3.png)
 
 - Major Customers Who Moved Out Had An Electronic Check As Payment Method On File Customers Who Opted For Credit-Card Automatic Transfer Or Bank Automatic Transfer And Mailed Check As Payment Method Were Less Likely To Move Out.
 
-![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/cf8dc72e-6e21-4259-a155-a79427ab0a40)
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/4.png)
 
 - Customers With Higher Monthly Charges Are Also More Likely To Churn.
 
-![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/3d8eb1d6-ff38-479c-8a5e-6b0bce1f8566)
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/5.png)
 
 - Most Of The Senior Citizens Churn.
 - Customers With Paperless Billing Are Most Likely To Churn.
@@ -59,8 +59,10 @@ Now that the data is processed and cleaned, let’s start predicting the churn s
 - Random Forest Classifier Gives 77% F1 Score With Balanced, Scaled Data.
 - Neural Networks Give The Best Accuracy Score Of 86% .
 
-### COMPARATIVE EVALUATIONS OF ALL ML MODELS USED
+### COMPARATIVE EVALUATION OF ALL ML MODELS USED
 Logistic regression, SVM Classifier, Random Forest, KNN, XGBoost Classifier, LightGBM Classifier tuned with best/recommended parameters using cross-validation.
+
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/6.png)
 
 ### LOSS CURVES FOR TRAINING AND VALIDATION METRICS
 
