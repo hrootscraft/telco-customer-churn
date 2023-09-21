@@ -98,6 +98,9 @@ Logistic regression, SVM Classifier, Random Forest, KNN, XGBoost Classifier, Lig
 ![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/12.png)
 
 ### DEPLOYMENT USING STREAMLIT
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/13.png)
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/14.png)
+
 
 ### CONCLUSION
 - The best way to avoid customer churn is to identify customers who are at risk of churning and working to improve their satisfaction.
