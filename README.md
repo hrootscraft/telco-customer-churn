@@ -1,6 +1,5 @@
 # Telco Customer Churn
-<br>
-
+<sup>Supervised Machine Learning Project : An End-To-End Pipeline</sup>
 ### INTRODUCTION
 
 **Did you know that attracting a new customer costs five times as much as keeping an existing one?**
@@ -23,12 +22,27 @@
 
 ### EDA REPORT
 - 26.5 % Of Customers Switched To Another Firm.
+  
+![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/967c1774-da2a-47f6-a470-351727e68a07)
+
 - Both Genders Behaved In Similar Fashion When It Comes To Migrating To Another Service Provider/Firm.
+
+![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/8e352f19-4a2b-4bf7-9145-fbeca5a303bb)
+
 - About 75% Of Customer With Month-To-Month Contract Opted To Move Out As Compared To 13% Of Customers With One Year Contract And 3% With Two Year Contract.
+
+![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/3a2f1ab9-d0ed-4133-b79f-0b0e7d33216a)
+
 - Major Customers Who Moved Out Had An Electronic Check As Payment Method On File Customers Who Opted For Credit-Card Automatic Transfer Or Bank Automatic Transfer And Mailed Check As Payment Method Were Less Likely To Move Out.
+
+![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/cf8dc72e-6e21-4259-a155-a79427ab0a40)
+
+- Customers With Higher Monthly Charges Are Also More Likely To Churn.
+
+![image](https://github.com/rbb-99/telco-customer-churn/assets/84140842/3d8eb1d6-ff38-479c-8a5e-6b0bce1f8566)
+
 - Most Of The Senior Citizens Churn.
 - Customers With Paperless Billing Are Most Likely To Churn.
-- Customers With Higher Monthly Charges Are Also More Likely To Churn.
 
 ### DATA PRE-PROCESSING AND CLEANING
 - Standard scalar to scale numerical columns down to the same range.
