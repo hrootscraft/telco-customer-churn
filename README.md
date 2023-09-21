@@ -92,8 +92,8 @@ Logistic regression, SVM Classifier, Random Forest, KNN, XGBoost Classifier, Lig
 ![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/6.png)
 
 ### LOSS CURVES FOR TRAINING AND VALIDATION METRICS
-![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/9.png)
 ![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/8.png)
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/9.png)
 
 ### DEPLOYMENT USING STREAMLIT
 
