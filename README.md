@@ -84,7 +84,10 @@ Now that the data is processed and cleaned, let’s start predicting the churn s
 - Random Forest Classifier Gives Best Prediction On Raw Unscaled Data With F1 Score Of 79% .
 - Knn Classifier Gives A 78% F1 Score With Scaled Data.
 - Random Forest Classifier Gives 77% F1 Score With Balanced, Scaled Data.
-- Neural Networks Give The Best Accuracy Score Of 86% .
+- Neural Networks Give The Best Accuracy Score Of 87% .
+
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/11.png)
+
 
 ### COMPARATIVE EVALUATION OF ALL ML MODELS USED
 Logistic regression, SVM Classifier, Random Forest, KNN, XGBoost Classifier, LightGBM Classifier tuned with best/recommended parameters using cross-validation.
@@ -92,8 +95,7 @@ Logistic regression, SVM Classifier, Random Forest, KNN, XGBoost Classifier, Lig
 ![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/6.png)
 
 ### LOSS CURVES FOR TRAINING AND VALIDATION METRICS
-![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/10.png)
-![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/9.png)
+![image](https://github.com/rbb-99/telco-customer-churn/blob/main/assets/12.png)
 
 ### DEPLOYMENT USING STREAMLIT
 
