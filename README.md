@@ -1,6 +1,8 @@
-# Telco ustomer Churn
+# Telco Customer Churn
 <br>
+
 ### INTRODUCTION
+
 **Did you know that attracting a new customer costs five times as much as keeping an existing one?**
 
 - The telecommunications business has an annual churn rate of 15% - 25% in this highly competitive market.
@@ -14,11 +16,10 @@
 ### DATA OVERVIEW
 - Each row represents a customer, each column contains customer’s attributes described on the column Metadata.
 - The data set includes information about :
-  - Customers who left within the last month – the column is called Churn
-  - Services that each customer has signed up for – phone, multiple lines, internet, online security, online backup, device protection, tech support, and streaming TV and movies
-  - Customer account information – how long they’ve been a customer, contract, payment method,
-paperless billing, monthly charges, and total charges
-  - Demographic info about customers – gender, age range, and if they have partners and dependents
+  - Customers who left within the last month – the column is called Churn.
+  - Services that each customer has signed up for – phone, multiple lines, internet, online security, online backup, device protection, tech support, and streaming TV and movies.
+  - Customer account information – how long they’ve been a customer, contract, payment method, paperless billing, monthly charges, and total charges.
+  - Demographic info about customers – gender, age range, and if they have partners and dependents.
 
 ### EDA REPORT
 - 26.5 % Of Customers Switched To Another Firm.
@@ -45,7 +46,7 @@ Now that the data is processed and cleaned, let’s start predicting the churn s
 - Neural Networks Give The Best Accuracy Score Of 86% .
 
 ### COMPARATIVE EVALUATIONS OF ALL ML MODELS USED
-Logistic regression, SVM Classifier, Random Forest, KNN, XGBoost Classifier, LightGBM Classifier tuned with best/recommended parameters using cross-validation
+Logistic regression, SVM Classifier, Random Forest, KNN, XGBoost Classifier, LightGBM Classifier tuned with best/recommended parameters using cross-validation.
 
 ### LOSS CURVES FOR TRAINING AND VALIDATION METRICS
 
@@ -59,3 +60,6 @@ Logistic regression, SVM Classifier, Random Forest, KNN, XGBoost Classifier, Lig
   - _suitable to classification problems_
   - _robust to imbalance of the target classes compared to accuracy_
 - The confusion matrix  was used to check if for avoidance of both type I error and type II errors.
+
+**References:**
+- [Kaggle Dataset by Blastchar](https://www.kaggle.com/datasets/blastchar/telco-customer-churn)
