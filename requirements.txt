@@ -1,0 +1,13 @@
+numpy
+pandas
+seaborn
+scikit-learn
+matplotlib
+tensorflow
+streamlit
+statsmodels
+openpyxl
+lxml
+lightgbm
+xgboost
+imblearn
