@@ -1,5 +1,6 @@
 # Telco Customer Churn
-<sup>Supervised Machine Learning Project : An End-To-End Pipeline</sup>
+<sup>Supervised Machine Learning Project</sup>
+
 ### INTRODUCTION
 
 **Did you know that attracting a new customer costs five times as much as keeping an existing one?**
@@ -11,6 +12,32 @@
   - grow and thrive,
   - lower the cost of initiation,
   - larger the profit.
+
+### TASK
+Train various ML classifier models to perform “Uplift Modeling” by targeting potential customers with the intention of reducing marketing costs while preserving the profit margins. 
+
+### SUMMARY 
+#### 1. Data Analysis 
+- Missing values
+- One-hot encoding
+- Feature engineering
+- Heatmap/correlation Analysis
+- Backward stepwise elimination
+- Standard scaling
+- Synthetic Data Augmentation (SMOTE)
+- Principal Component Analysis 
+#### 2. Baseline Models 
+- Logistic Regression
+- K-nearest neighbor
+- Support Vector Machines
+- Random Forest Classifier
+- XGBoost
+- Ensemble (Random Forest Classifier + XGBoost)
+- LightBoost
+- Artificial Neural Network 
+#### 3. Hyper-parameter tuning 
+- GridSearchCV
+- RandomSearchCV 
 
 ### DATA OVERVIEW
 - Each row represents a customer, each column contains customer’s attributes described on the column Metadata.
