@@ -14,7 +14,7 @@
   - larger the profit.
 
 ### TASK
-Train various ML classifier models to perform “Uplift Modeling” by targeting potential customers with the intention of reducing marketing costs while preserving the profit margins. 
+Train various ML classifier models to target potential customers with the intention of reducing marketing costs while preserving the profit margins. 
 
 ### SUMMARY 
 #### 1. Data Analysis 
