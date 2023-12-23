@@ -1,5 +1,5 @@
 # Telco Customer Churn
-<sup>Supervised Machine Learning Project</sup>
+<sup>Supervised Machine Learning Project - Classification</sup>
 
 ### INTRODUCTION
 
