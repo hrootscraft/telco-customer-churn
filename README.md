@@ -25,7 +25,7 @@ Train various ML classifier models to target potential customers with the intent
 - Backward stepwise elimination
 - Standard scaling
 - Synthetic Data Augmentation (SMOTE)
-- Principal Component Analysis 
+- Principal Component Analysis  
 #### 2. Baseline Models 
 - Logistic Regression
 - K-nearest neighbor
