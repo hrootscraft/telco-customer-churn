@@ -27,6 +27,10 @@ def main(argv: list[str] | None = None) -> int:
             "benchmark-events",
             "phase 2: rerun four models with and without event features; writes results/ and figures",
         ),
+        (
+            "loop",
+            "phase 3: run every targeting policy through the weekly offer loop; writes results/ and figures",
+        ),
     ]:
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("--config", default=None, help="YAML config (default configs/default.yaml)")
@@ -39,6 +43,18 @@ def main(argv: list[str] | None = None) -> int:
             "--engine", default="duckdb", choices=["duckdb", "spark"], help="features: SQL engine"
         )
         sp.add_argument("--force", action="store_true", help="events: regenerate even if present")
+        sp.add_argument(
+            "--offers", default=None, help="loop: offers YAML (default configs/offers.yaml)"
+        )
+        sp.add_argument(
+            "--n-customers", type=int, default=None, help="loop: subsample the book, for CI"
+        )
+        sp.add_argument(
+            "--replicates",
+            type=int,
+            default=None,
+            help="loop: replays of the realised outcomes (default 5, 0 with --fast)",
+        )
     a = p.parse_args(argv)
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout
@@ -75,6 +91,24 @@ def main(argv: list[str] | None = None) -> int:
         out.parent.mkdir(parents=True, exist_ok=True)
         F.to_parquet(out, index=False)
         print(f"{len(F):,} customers x {F.shape[1] - 2} features as of {as_of.date()} -> {out}")
+        return 0
+    if a.command == "loop":
+        from churnprop.offers.menu import load_offers
+        from churnprop.pipeline_offers import run_phase3
+
+        reps = a.replicates if a.replicates is not None else (0 if a.fast else 5)
+        h = run_phase3(
+            cfg,
+            load_offers(a.offers),
+            a.out,
+            a.figures,
+            n_customers=a.n_customers,
+            n_replicates=reps,
+        )
+        for r in h["policies"]:
+            print(
+                f"{r['policy']:<16} net ${r['net_value']:>10,.0f}   truth ${r['truth_reward_per_week']:>8,.0f}/wk"
+            )
         return 0
     if a.command == "benchmark-events":
         from churnprop.pipeline_events import run_phase2

@@ -13,9 +13,10 @@ as of a date, a weekly multi-offer targeting loop under a budget with a randomis
 exploration holdout, a model registry, drift monitoring, an Airflow DAG, and a
 Streamlit app for the people who own the offers.
 
-> **Status: phases 1 and 2 of 5 are complete** (honest benchmark, feature
-> selection, SHAP, tests, CI; then a synthetic event log with point-in-time SQL
-> features). The build order and what each phase adds is in [Phases](#phases). The
+> **Status: phases 1 to 3 of 5 are complete** (honest benchmark, feature
+> selection, SHAP, tests, CI; a synthetic event log with point-in-time SQL
+> features; a simulated three-offer weekly loop with a randomised holdout, budgeted
+> uplift targeting and off-policy evaluation). The build order and what each phase adds is in [Phases](#phases). The
 > 2023 version of this repository (one notebook and a Streamlit script that
 > retrained models on every click) is kept in `legacy/`.
 >
@@ -23,8 +24,9 @@ Streamlit app for the people who own the offers.
 > services, charges and churn labels are real (IBM's sample data). The monthly
 > bills, payments, usage, tickets and plan changes behind each customer are
 > **synthetic**, generated to be consistent with each real row, with a small churn
-> signal planted and calibrated (D9). Offer responses in phase 3 will be synthetic
-> too. Every number below says which it is.
+> signal planted and calibrated (D9). How customers respond to the three offers in
+> phase 3 is synthetic too, planted from readable rules (D12). Every number below
+> says which it is.
 
 This is the operations-side companion to
 [revenue-tier-and-churn-experiment](https://github.com/hrootscraft/revenue-tier-and-churn-experiment)
@@ -32,7 +34,7 @@ This is the operations-side companion to
 effect durability on simulated data. The split is deliberate:
 [`docs/learn/03_propensity_vs_uplift.md`](docs/learn/03_propensity_vs_uplift.md).
 
-## Headline results (`results/headline_phase1.json`, `results/headline_phase2.json`)
+## Headline results (`results/headline_phase{1,2,3}.json`)
 
 | Question | Method | Result |
 |---|---|---|
@@ -45,6 +47,8 @@ effect durability on simulated data. The split is deliberate:
 | What drives the score? | SHAP on LightGBM, one-hot columns folded back | **Contract 24%** of total attention, Dependents 17%, Tenure 10%. Month-to-month contracts churn at **42.7%** vs 2.8% on two-year (not the 75% vs 3% in older write-ups) |
 | What do event-level features add, computed as of a date? | 461k synthetic events → 22 features in DuckDB SQL with an `{as_of}` filter; same split and folds | **+0.03 to +0.05 PR-AUC** on the hold-out for all four models (XGBoost 0.671 → 0.698, logistic 0.659 → 0.708); event features take 29% of SHAP attention, led by the 3-month usage trend. Lift is from a *planted* signal calibrated to be modest (D9) |
 | Does anything read the future? | Point-in-time test: edit every event after the as-of date, rebuild | **Feature table unchanged, byte for byte** (`tests/test_events.py::test_point_in_time`) |
+| Which offer, for whom, under a budget? | 12-week simulated loop, 8% randomised holdout, six policies on common random numbers | Learned uplift + Lagrangian allocation earns **$14.4k/week vs $6.8k** for risk × value over the second half, with 19% fewer offers and half the sleeping-dog share; oracle ceiling $47.0k/week. Responses are *planted* (D12) |
+| Can the holdout prove it? | IPS / doubly robust OPE on the exploration rows, with power | **Not at 12 weeks**: DR interval ±$309.3k/week around a true $17.2k; ~5,928 weeks to detect (D18, figure 16) |
 
 <p align="center"><img src="reports/figures/02_benchmark.png" width="900"></p>
 
@@ -54,12 +58,13 @@ effect durability on simulated data. The split is deliberate:
 2. [The data, and the leakage trap in it](#2-the-data-and-the-leakage-trap-in-it)
 3. [Phase 1 results](#3-phase-1-results)
 4. [Phase 2: event-level features in SQL, as of a date](#4-phase-2-event-level-features-in-sql-as-of-a-date)
-5. [What I would tell marketing](#5-what-i-would-tell-marketing)
-6. [Phases](#phases)
-7. [How to run it](#7-how-to-run-it)
-8. [Repository layout](#8-repository-layout)
-9. [Learning write-ups](#9-learning-write-ups)
-10. [Limitations](#10-limitations)
+5. [Phase 3: three offers, a weekly loop, uplift under a budget](#5-phase-3-three-offers-a-weekly-loop-uplift-under-a-budget)
+6. [What I would tell marketing](#6-what-i-would-tell-marketing)
+7. [Phases](#phases)
+8. [How to run it](#8-how-to-run-it)
+9. [Repository layout](#9-repository-layout)
+10. [Learning write-ups](#10-learning-write-ups)
+11. [Limitations](#11-limitations)
 
 ## 1. The business problem
 
@@ -215,7 +220,73 @@ is the check that matters. Why the lift is honest only as a statement about the
 pipeline, and what a real lift would need:
 [`docs/learn/04_point_in_time_features.md`](docs/learn/04_point_in_time_features.md).
 
-## 5. What I would tell marketing
+## 5. Phase 3: three offers, a weekly loop, uplift under a budget
+
+Phases 1–2 say *who* is likely to leave. A retention programme has to decide *who
+gets which offer this week* with a fixed budget, learn from what happened, and be
+able to prove afterwards that it worked. The IBM file has no treatment in it, so
+phase 3 **simulates how the real customers respond** to three offers (a $45 bill
+credit, a $60 tech-support bundle, a $70 contract-upgrade incentive) and runs the
+weekly loop a team would run. Everything about the responses is invented and
+written as readable rules in [`configs/offers.yaml`](configs/offers.yaml), including
+**sleeping dogs**: new customers who read a credit as bait-and-switch, two-year
+customers whom any contact reminds to shop (D12).
+
+**The loop** (`churnprop loop`, 12 weeks, `src/churnprop/loop.py`). Each week, the
+active book is scored; 8% of eligible customers go to a **randomised exploration
+holdout** (uniform over control and the three offers, probability logged); the
+policy spends the rest of a $32,000 budget; outcomes (churn within 4 weeks) mature
+four weeks later and are appended to the training log; a customer who got an arm is
+on cooldown for 4 weeks. Six policies run on **identical customers, budget and coin
+flips**, so the differences are the targeting rule's:
+
+| Policy | Expected net value, $/week (planted truth) | …second half of the horizon | Customers retained vs no offers (mean ± sd, 5 replays) | Share of offers sent to sleeping dogs | Offers sent |
+|---|---|---|---|---|---|
+| Random outreach (bill credit) | $-7.6k | $-9.3k | +21 ± 7 | 30% | 4,984 |
+| Highest churn risk (bill credit) | $11.7k | $7.2k | +57 ± 9 | 19% | 4,897 |
+| Risk × CLTV × assumed save rate − cost | $12.2k | $6.8k | +56 ± 9 | 18% | 4,891 |
+| **Learned multi-offer uplift + budget allocator** | $15.4k | $14.4k | +69 ± 17 | 15% | 3,961 |
+| Oracle: planted truth, same allocator | $47.0k | $36.4k | +131 ± 5 | 0% | 3,708 |
+
+<p align="center"><img src="reports/figures/12_policy_comparison.png" width="820"></p>
+
+How to read it. **Risk-ranked targeting earns money** ($11.7k a week on a ~5,000
+customer book) but one offer in five goes to a customer the offer pushes out, because
+"likely to churn" and "will respond to this offer" are different lists
+([learn note 03](docs/learn/03_propensity_vs_uplift.md)). The **uplift policy starts
+as the risk × value heuristic**, fits a T-learner (one LightGBM per arm, D17) in week
+5 when the first outcomes mature, and from then on chooses *which* offer and *whether
+to offer at all*: over the second half it earns **$14.4k a week against
+$6.8k** for the heuristic, sends 19% fewer offers, and halves the
+sleeping-dog share. It still captures only a third of the oracle, which knows every
+customer's true response: twelve weeks of an 8% holdout is a small amount of causal
+data, and the learning curve (figure 13) is still rising at week 12.
+
+**Budget allocation** (`uplift/allocate.py`). "One arm per customer, total cost ≤
+budget" is solved with a single Lagrange multiplier λ: every offer must clear
+`uplift × CLTV − cost − λ · cost > 0`, and bisection on λ hits the budget. The
+allocator is within 0.0% of the LP relaxation's bound (`lp_gap` in
+`headline_phase3.json`) and λ is a number finance can read: at a $10k budget the
+marginal offer returns $5.6 per $1 of cost beyond itself; at $80k, $0.37 (figure 15).
+
+**Off-policy evaluation, and why it is reported with its standard error.** The
+exploration rows let IPS and doubly robust estimators value any policy without
+running it (`uplift/ope.py`). Both are unbiased, and at 12 weeks both are useless:
+the reward is dollars × a rare churn event, so the DR 95% interval on the uplift
+policy's value is **±$309.3k a week around a true $17.2k**; the minimum effect
+this holdout could detect at 80% power is $441.8k a week, and detecting the
+policy's actual value would take on the order of 5,928 weeks of logging (figure 16,
+D18). That is the real finding of the phase for anyone who runs retention holdouts:
+a small randomised holdout proves a programme is not harmful long before it measures
+its value, which is why the simulator's planted truth is the yardstick here and why
+the learner trains on every logged row rather than the holdout alone (D17). What
+would fix it (a holdout concentrated where the policy acts, a churn-rate test with
+dollars reported descriptively, more weeks) is worked through with numbers in
+[`docs/learn/05_budget_allocation_and_ope.md`](docs/learn/05_budget_allocation_and_ope.md).
+
+<p align="center"><img src="reports/figures/13_learning_curve.png" width="820"></p>
+
+## 6. What I would tell marketing
 
 1. **The model is ready to rank, and its probabilities can be trusted as
    probabilities.** The riskiest 10% of customers churn at 78%. A list of the top
@@ -237,11 +308,11 @@ pipeline, and what a real lift would need:
 |---|---|---|
 | **1. Honest benchmark** | `src/churnprop` package, config, tests, CI; leakage gates; 8 models with resampling inside CV; calibration; stepwise/L1/permutation; SHAP at three altitudes | **done** |
 | **2. Event-level features in SQL** | Synthetic monthly bills, payments, usage, tickets and plan changes behind each real customer; DuckDB SQL feature families computed *as of* a date; a point-in-time leakage test; optional Spark path; benchmark re-run with event features | **done** |
-| 3. Offers and the weekly loop | Three offers with different costs plus control, responses simulated on the real customers; a 12-week loop with a 10% randomised exploration holdout; multi-treatment uplift; Lagrangian allocation under a weekly budget; off-policy evaluation | next |
-| 4. Production | MLflow registry with a committed production export; batch scoring CLI; PSI/KS, calibration and uplift drift monitoring with injected drift weeks; Airflow DAG (validated in CI) and a GitHub Actions weekly run of the same steps | |
+| **3. Offers and the weekly loop** | Three offers plus control, responses planted on the real customers with sleeping dogs; a 12-week loop with an 8% randomised exploration holdout, cooldowns and matured outcomes; six policies on common random numbers with replays; multi-arm T/S-learner uplift; Lagrangian allocation under a weekly budget with an LP check; IPS/DR off-policy evaluation with its power calculation | **done** |
+| 4. Production | MLflow registry with a committed production export; batch scoring CLI; PSI/KS, calibration and uplift drift monitoring with injected drift weeks; Airflow DAG (validated in CI) and a GitHub Actions weekly run of the same steps | next |
 | 5. App and narrative | Three-page Streamlit app (score, this week's offer plan by segment, monitoring); learning notes; model card | |
 
-## 7. How to run it
+## 8. How to run it
 
 ```bash
 python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
@@ -252,17 +323,21 @@ churnprop benchmark --fast   # 3 folds, 100 trees, 10 epochs: ~2 min
 churnprop events             # phase 2: simulate the event log into data/events/ (~25 s)
 churnprop features --as-of 2024-03-31   # point-in-time features as of any date -> results/
 churnprop benchmark-events   # phase 2: four models with vs without event features (~3 min)
+churnprop loop               # phase 3: six policies through the 12-week loop + 5 replays (~4 min)
+churnprop loop --offers my_offers.yaml --replicates 0   # your own menu / budget / horizon
 make test                    # unit tests (~1 min)
 make test-all                # + end-to-end fast run
 ```
 
 `configs/default.yaml` holds every tunable (split, folds, regime, model list, SHAP
-segments). Results are deterministic for a given seed.
+segments); `configs/offers.yaml` holds the offer menu, planted responses, budget and
+loop settings. Results are deterministic for a given seed.
 
-## 8. Repository layout
+## 9. Repository layout
 
 ```
 configs/default.yaml        every tunable, commented
+configs/offers.yaml         offer menu, planted responses, budget, loop and learner settings
 data/raw/                   the IBM xlsx (unchanged)
 data/events/                synthetic event log, Parquet by month (generated, gitignored)
 sql/                        one point-in-time feature family per file, parameter {as_of}
@@ -273,6 +348,13 @@ src/churnprop/
   events/simulate.py        the event-log generator, consistent with each real row
   features_sql/build.py     runs sql/ through DuckDB (or Spark) as of a date
   pipeline_events.py        phase 2 end to end
+  offers/menu.py            typed view of offers.yaml
+  offers/simulate.py        planted responses: potential outcomes per customer x arm
+  uplift/learner.py         multi-arm T- and S-learner on LightGBM
+  uplift/allocate.py        Lagrangian budget allocation + LP bound
+  uplift/ope.py             IPS and doubly robust off-policy evaluation
+  loop.py                   the weekly loop: holdout, cooldown, maturation, six policies
+  pipeline_offers.py        phase 3 end to end, replays, budget frontier, power
   propensity/
     models.py               the 8-model zoo: prep -> [smote] -> clf pipelines
     nn.py                   PyTorch MLP as a scikit-learn estimator
@@ -282,17 +364,18 @@ src/churnprop/
   explain.py                SHAP: global, by segment, by customer
   plots.py                  all figures
   pipeline.py               phase 1 end to end
-  cli.py                    `churnprop benchmark | events | features | benchmark-events`
+  cli.py                    `churnprop benchmark | events | features | benchmark-events | loop`
 tests/                      data facts, leakage gate, SMOTE-in-pipeline, every model, stepwise, SHAP,
-                            event consistency, point-in-time, e2e
+                            event consistency, point-in-time, e2e; allocator vs LP, OPE on
+                            synthetic logs, learner recovers planted sign, loop invariants
 results/                    tables the README quotes
-reports/figures/            figures 01-11
-docs/DECISIONS.md           D1-D8, the choices and why
+reports/figures/            figures 01-16
+docs/DECISIONS.md           D1-D18, the choices and why
 docs/learn/                 learning notes with worked examples and exercises
 legacy/                     the 2023 notebook and Streamlit script, unchanged
 ```
 
-## 9. Learning write-ups
+## 10. Learning write-ups
 
 Each note is written to build intuition first, with worked examples and exercises
 (answers folded):
@@ -301,16 +384,19 @@ Each note is written to build intuition first, with worked examples and exercise
 2. [SHAP at three altitudes](docs/learn/02_shap_three_altitudes.md)
 3. [Propensity is not uplift](docs/learn/03_propensity_vs_uplift.md)
 4. [Point-in-time features from an event log](docs/learn/04_point_in_time_features.md)
+5. [Spending a weekly budget, and finding out afterwards whether it worked](docs/learn/05_budget_allocation_and_ope.md)
 
-## 10. Limitations
+## 11. Limitations
 
 * The event log is synthetic. Its consistency with the snapshot is enforced, but
   its churn signal is planted, so the +0.03 PR-AUC says the pipeline works, not what
   real events would add. Real bills and tickets would also carry seasonality,
   outages and re-engagement that the generator does not model.
 * No treatment: nothing in the file says what anyone was offered, so no causal claim
-  is made from it. Phase 3 simulates offer responses on the real customers and runs
-  the loop that would generate real treatment data.
+  is made from it. Phase 3's offer responses are planted rules (D12); the policy
+  comparison shows the loop, the learner, the allocator and the evaluation working
+  on a known truth, not what these offers would do to real customers. The 4-week
+  hazard is inflated to compress a year of learning into a quarter (D13).
 * The hold-out is 1,409 customers, so differences below ~0.01 ROC-AUC between models
   are noise; the README says "tie" where it is one.
 * Hyper-parameters are sensible defaults, not tuned; tuning would move the top six
