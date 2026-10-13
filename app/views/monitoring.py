@@ -45,7 +45,7 @@ def render():
     with tabs[0]:
         p18 = C.ROOT / "reports" / "figures" / "18_monitoring_timeline.png"
         if p18.exists():
-            st.image(str(p18), use_container_width=True)
+            st.image(str(p18), width="stretch")
         if len(summary):
             show = summary[
                 [
@@ -76,7 +76,7 @@ def render():
                     },
                     na_rep="",
                 ),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             st.caption(
@@ -85,7 +85,7 @@ def render():
     with tabs[1]:
         p17 = C.ROOT / "reports" / "figures" / "17_drift_heatmap.png"
         if p17.exists():
-            st.image(str(p17), use_container_width=True)
+            st.image(str(p17), width="stretch")
         psi = C.read_csv("results/monitoring/feature_psi.csv", index_col=0)
         if len(psi):
             wk = st.select_slider("Week", options=list(psi.index), value=psi.index[-1])
@@ -98,7 +98,7 @@ def render():
                 for v in row["PSI"]
             ]
             row["status"] = row["status"].map(C.status_badge)
-            st.dataframe(row.style.format({"PSI": "{:.3f}"}), use_container_width=True)
+            st.dataframe(row.style.format({"PSI": "{:.3f}"}), width="stretch")
     with tabs[2]:
         weeks = sorted(
             int(p.stem.split("_")[1]) for p in (C.ROOT / "results" / "monitoring").glob("week_*.md")
@@ -112,7 +112,7 @@ def render():
         if len(reg):
             st.dataframe(
                 reg.style.format({"pr_auc": "{:.3f}", "roc_auc": "{:.3f}", "ece": "{:.3f}"}),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         st.markdown(

@@ -243,3 +243,14 @@ def test_score_frame_schema(tmp_registry, cfg, small_df):
     assert s["decile"].between(1, 10).all()
     assert s["reason_1"].str.len().gt(0).mean() > 0.9
     assert (s["model_version"] == model.version).all()
+    # one customer at a time (the app's "describe a customer" form) must not raise
+    one = score_frame(batch.head(1), model, id_col=cfg.data.id_col)
+    assert len(one) == 1 and one["decile"].isna().all() and 0 <= one["score"].iloc[0] <= 1
+
+
+def test_score_deciles_small_and_large():
+    from churnprop.scoring import score_deciles
+
+    assert score_deciles(np.array([0.3])).isna().all()
+    d = score_deciles(np.linspace(0, 1, 50))
+    assert d.min() == 1 and d.max() == 10 and d.iloc[-1] == 1

@@ -27,7 +27,8 @@ comparison, figure 17 the drift heat map. [`docs/DECISIONS.md`](docs/DECISIONS.m
 records the 24 choices and why; [`docs/SIMPLIFICATIONS.md`](docs/SIMPLIFICATIONS.md)
 lists what is simulated and what production would do instead; the six
 [learning notes](#12-learning-write-ups) build the intuition with worked examples
-and exercises. The app runs with `streamlit run app/streamlit_app.py`.
+and exercises. The app is live at **[churnprop.streamlit.app](https://churnprop.streamlit.app)**
+(or `streamlit run app/streamlit_app.py` locally).
 
 > **Status: all five phases are built.** The build order and what each phase adds is
 > in [Phases](#phases). The 2023 version of this repository (one notebook and a
@@ -393,6 +394,7 @@ hosting Airflow. What the monitors can and cannot see, with the arithmetic:
 
 ## 7. Phase 5: the app for the people who own the offers
 
+Live at [churnprop.streamlit.app](https://churnprop.streamlit.app); locally,
 `streamlit run app/streamlit_app.py` ([`app/`](app/)). Three pages, all reading
 only what is committed to the repository (the production export, the snapshot, the
 results), so the same code runs on Streamlit Cloud from a clone with no registry

@@ -50,3 +50,13 @@ def test_monitoring_page_shows_latest_verdict():
     labels = {m.label: m.value for m in at.metric}
     assert "Latest verdict" in labels
     assert "Retrain recommended" in labels
+
+
+def test_score_page_scores_one_described_customer():
+    at = _run("score")
+    at.radio[0].set_value("A customer I describe").run()
+    assert not at.exception, [e.value for e in at.exception]
+    at.button[0].click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    metrics = [m.label for m in at.metric]
+    assert "4-week churn score" in metrics
