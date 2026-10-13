@@ -1,0 +1,89 @@
+# ---------------------------------------------------------------------------
+# churnprop default configuration
+#
+# Every number that shapes the benchmark, the targeting layer, the monitoring
+# thresholds or the (later) offer simulation lives here, so a reviewer can see
+# the choices in one place and a contributor can run a sensitivity analysis
+# without touching code. See docs/DECISIONS.md for why each value was picked.
+# ---------------------------------------------------------------------------
+
+seed: 42
+
+data:
+  raw_path: data/raw/Telco_customer.xlsx
+  id_col: CustomerID
+  target: Churn Value
+  # Columns that are either identifiers, constant, geographic noise, or
+  # *post-outcome* (Churn Label / Score / Reason are recorded after the customer
+  # left; CLTV is IBM's own lifetime-value score). None may enter a feature
+  # matrix. CLTV is used only in the decision layer, never as a feature.
+  leakage_cols:
+    - Churn Label
+    - Churn Score
+    - Churn Reason
+    - CLTV
+  drop_cols:
+    - Count
+    - Country
+    - State
+    - City
+    - Zip Code
+    - Lat Long
+    - Latitude
+    - Longitude
+  numeric:
+    - Tenure Months
+    - Monthly Charges
+    - Total Charges
+  categorical:
+    - Gender
+    - Senior Citizen
+    - Partner
+    - Dependents
+    - Phone Service
+    - Multiple Lines
+    - Internet Service
+    - Online Security
+    - Online Backup
+    - Device Protection
+    - Tech Support
+    - Streaming TV
+    - Streaming Movies
+    - Contract
+    - Paperless Billing
+    - Payment Method
+  # Engineered on top of the raw columns (see churnprop.features.add_engineered).
+  engineered_numeric:
+    - n_addon_services
+    - avg_monthly_charge
+  engineered_categorical:
+    - tenure_band
+
+benchmark:
+  test_size: 0.2            # stratified hold-out, never touched until the final table
+  n_folds: 5
+  n_repeats: 2
+  # none | smote | class_weight. All three are compared on the same CV folds; this
+  # is the regime the hold-out table and the production model use. `none` won:
+  # SMOTE costs PR-AUC and calibration on this data (see DECISIONS.md, D3).
+  resampling: none
+  smote_k_neighbors: 5
+  models: [logistic, knn, svm, random_forest, xgboost, lightgbm, ensemble, mlp]
+  top_decile: 0.10          # for lift@top-decile
+  precision_floor: 0.50     # for recall@precision
+  calibration_bins: 10
+  fast:                     # overrides for CI / `--fast`
+    n_repeats: 1
+    n_folds: 3
+    n_estimators: 100
+    mlp_epochs: 10
+
+stepwise:
+  alpha: 0.05               # drop the feature with the largest p-value while max p > alpha
+  l1_C: 0.5                 # L1-logistic comparison
+  n_permutations: 10        # permutation-importance repeats
+
+explain:
+  model: lightgbm           # tree model SHAP is computed on
+  segments: [Contract, Internet Service, tenure_band, Payment Method]
+  n_customers_waterfall: 3
