@@ -1,0 +1,100 @@
+{
+  "snapshot_date": "2024-06-30",
+  "n_event_rows": 461091,
+  "n_billing": 243479,
+  "n_usage": 192643,
+  "n_tickets": 20156,
+  "n_plan_changes": 4813,
+  "n_event_features": 22,
+  "planted_signal": 0.15,
+  "comparison": [
+    {
+      "model": "logistic",
+      "pretty": "Logistic regression",
+      "roc_auc_snapshot": 0.8518,
+      "roc_auc_events": 0.8713,
+      "pr_auc_snapshot": 0.6594,
+      "pr_auc_events": 0.708,
+      "pr_auc_lift": 0.0485,
+      "cv_pr_auc_snapshot": 0.6834,
+      "cv_pr_auc_events": 0.7271,
+      "cv_pr_auc_sd": 0.018,
+      "lift_top_decile_snapshot": 2.8322,
+      "lift_top_decile_events": 3.046,
+      "brier_snapshot": 0.1344,
+      "brier_events": 0.1249
+    },
+    {
+      "model": "lightgbm",
+      "pretty": "LightGBM",
+      "roc_auc_snapshot": 0.8544,
+      "roc_auc_events": 0.869,
+      "pr_auc_snapshot": 0.6637,
+      "pr_auc_events": 0.6971,
+      "pr_auc_lift": 0.0334,
+      "cv_pr_auc_snapshot": 0.6795,
+      "cv_pr_auc_events": 0.7189,
+      "cv_pr_auc_sd": 0.0188,
+      "lift_top_decile_snapshot": 2.9925,
+      "lift_top_decile_events": 3.0994,
+      "brier_snapshot": 0.1335,
+      "brier_events": 0.127
+    },
+    {
+      "model": "xgboost",
+      "pretty": "XGBoost",
+      "roc_auc_snapshot": 0.8546,
+      "roc_auc_events": 0.8718,
+      "pr_auc_snapshot": 0.6706,
+      "pr_auc_events": 0.698,
+      "pr_auc_lift": 0.0274,
+      "cv_pr_auc_snapshot": 0.6861,
+      "cv_pr_auc_events": 0.725,
+      "cv_pr_auc_sd": 0.0181,
+      "lift_top_decile_snapshot": 2.9391,
+      "lift_top_decile_events": 3.046,
+      "brier_snapshot": 0.133,
+      "brier_events": 0.1255
+    },
+    {
+      "model": "mlp",
+      "pretty": "Neural net (PyTorch MLP)",
+      "roc_auc_snapshot": 0.8527,
+      "roc_auc_events": 0.8692,
+      "pr_auc_snapshot": 0.6485,
+      "pr_auc_events": 0.6939,
+      "pr_auc_lift": 0.0454,
+      "cv_pr_auc_snapshot": 0.6777,
+      "cv_pr_auc_events": 0.7194,
+      "cv_pr_auc_sd": 0.0235,
+      "lift_top_decile_snapshot": 2.7521,
+      "lift_top_decile_events": 3.0727,
+      "brier_snapshot": 0.1344,
+      "brier_events": 0.1267
+    }
+  ],
+  "event_feature_shap_share": 0.2939480825077105,
+  "top_event_features": [
+    {
+      "feature": "usage_trend_3m",
+      "share": 0.0518
+    },
+    {
+      "feature": "usage_gb_last_month",
+      "share": 0.0348
+    },
+    {
+      "feature": "late_days_90d",
+      "share": 0.0288
+    },
+    {
+      "feature": "downgrades_180d",
+      "share": 0.0198
+    },
+    {
+      "feature": "n_bills_visible",
+      "share": 0.0193
+    }
+  ],
+  "fast": false
+}

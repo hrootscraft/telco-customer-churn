@@ -196,16 +196,22 @@ def plot_calibration(cal: pd.DataFrame, models: list[str], out_dir: Path) -> Pat
     return _save(fig, out_dir, "05_calibration.png")
 
 
-def plot_shap_global(global_: pd.DataFrame, out_dir: Path, top: int = 12) -> Path:
+def plot_shap_global(
+    global_: pd.DataFrame,
+    out_dir: Path,
+    top: int = 12,
+    name: str = "06_shap_global.png",
+    title: str = "What drives the churn score, whole book",
+) -> Path:
     g = global_.head(top).iloc[::-1]
     fig, ax = plt.subplots(figsize=(6.8, 4.6))
     ax.barh(g["feature"], g["mean_abs_shap"], color=BLUE_RAMP[4], height=0.6)
     for i, (v, s) in enumerate(zip(g["mean_abs_shap"], g["share"], strict=True)):
         ax.text(v + 0.005, i, f"{s * 100:.0f}%", va="center", fontsize=8.5, color=INK)
     ax.set_xlabel("Mean |SHAP| (log-odds), share of total in label")
-    ax.set_title("What drives the churn score, whole book")
+    ax.set_title(title)
     ax.grid(axis="y", visible=False)
-    return _save(fig, out_dir, "06_shap_global.png")
+    return _save(fig, out_dir, name)
 
 
 def plot_shap_segments(by_segment: pd.DataFrame, seg_col: str, out_dir: Path, name: str) -> Path:
@@ -239,3 +245,39 @@ def plot_feature_selection(table: pd.DataFrame, out_dir: Path) -> Path:
     ax.set_title(f"Backward stepwise keeps {kept} of {len(t)} features (orange = dropped)")
     ax.grid(axis="y", visible=False)
     return _save(fig, out_dir, "07_feature_selection.png")
+
+
+def plot_event_feature_lift(comp: pd.DataFrame, out_dir: Path) -> Path:
+    """Hold-out PR-AUC per model, snapshot features vs snapshot + event features."""
+    fig, ax = plt.subplots(figsize=(7.2, 3.6))
+    y = np.arange(len(comp))
+    h = 0.36
+    ax.barh(
+        y - h / 2,
+        comp["pr_auc_snapshot"],
+        height=h - 0.03,
+        color=BLUE_RAMP[2],
+        label="snapshot features",
+    )
+    ax.barh(
+        y + h / 2,
+        comp["pr_auc_events"],
+        height=h - 0.03,
+        color=BLUE_RAMP[5],
+        label="snapshot + event features",
+    )
+    for i, (a, b) in enumerate(zip(comp["pr_auc_snapshot"], comp["pr_auc_events"], strict=True)):
+        ax.text(a + 0.004, i - h / 2, f"{a:.3f}", va="center", fontsize=8.5, color=INK)
+        ax.text(
+            b + 0.004, i + h / 2, f"{b:.3f}  (+{b - a:.3f})", va="center", fontsize=8.5, color=INK
+        )
+    ax.set_yticks(y, [PRETTY[m] for m in comp["model"]])
+    ax.invert_yaxis()
+    lo = float(min(comp["pr_auc_snapshot"].min(), comp["pr_auc_events"].min())) - 0.05
+    hi = float(comp["pr_auc_events"].max()) + 0.08
+    ax.set_xlim(max(0, lo), min(1, hi))
+    ax.set_xlabel("Hold-out PR-AUC")
+    ax.set_title("What point-in-time event features add (planted signal, see D9)")
+    ax.grid(axis="y", visible=False)
+    ax.legend(loc="lower right")
+    return _save(fig, out_dir, "10_event_feature_lift.png")

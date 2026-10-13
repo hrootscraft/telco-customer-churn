@@ -36,12 +36,7 @@ def test_backward_stepwise_drops_noise(small_split, cfg):
     rng = np.random.default_rng(0)
     X["pure_noise"] = rng.normal(size=len(X))
     feats = list(X.columns)
-    prep = make_preprocessor(cfg, feats)
-    prep.transformers[0] = (
-        "num",
-        prep.transformers[0][1],
-        prep.transformers[0][2] + ["pure_noise"],
-    )
+    prep = make_preprocessor(cfg, feats)  # undeclared columns are treated as numeric
     Z = fit_transform_frame(prep, X)
     trace = backward_stepwise(Z, small_split.y_train, feats, alpha=0.05)
     assert "pure_noise" not in trace.kept
@@ -87,3 +82,22 @@ def test_phase1_end_to_end(tmp_path, cfg):
     saved = json.loads((tmp_path / "results" / "headline_phase1.json").read_text())
     assert saved["holdout"]["roc_auc"] > 0.82
     assert h["nobody_churns_accuracy"] == pytest.approx(0.7346, abs=1e-3)
+
+
+def test_benchmark_uses_every_split_column(small_split, cfg):
+    """A column that is not in the config's feature list must still reach the model."""
+    import numpy as np
+
+    from churnprop.propensity.benchmark import run_benchmark
+
+    rng = np.random.default_rng(0)
+    leaky = small_split.__class__(**{**small_split.__dict__})
+    leaky.X_train = small_split.X_train.assign(
+        oracle=small_split.y_train.to_numpy() + rng.normal(0, 0.3, len(small_split.y_train))
+    )
+    leaky.X_test = small_split.X_test.assign(
+        oracle=small_split.y_test.to_numpy() + rng.normal(0, 0.3, len(small_split.y_test))
+    )
+    base = run_benchmark(small_split, cfg, models=("logistic",), regimes=("none",)).test
+    with_oracle = run_benchmark(leaky, cfg, models=("logistic",), regimes=("none",)).test
+    assert with_oracle["roc_auc"].iloc[0] > base["roc_auc"].iloc[0] + 0.05
