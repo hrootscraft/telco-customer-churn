@@ -3,24 +3,37 @@
 **Who is about to leave, what is each of them worth, and which ones should a fixed
 weekly retention budget reach?**
 
-An end-to-end retention-analytics project on the IBM Telco customer churn data
-(7,043 real subscribers, 26.5% churn). It benchmarks eight churn-propensity models
-the honest way (resampling inside cross-validation, one untouched hold-out,
-calibration reported next to discrimination), explains the scores with SHAP at
-three altitudes (book, segment, customer), and is being extended, phase by phase,
-into the thing a retention team actually runs: event-level features built in SQL
-as of a date, a weekly multi-offer targeting loop under a budget with a randomised
-exploration holdout, a model registry, drift monitoring, an Airflow DAG, and a
-Streamlit app for the people who own the offers.
+An end-to-end retention system on the IBM Telco customer churn data (7,043 real
+subscribers, 26.5% churn), built the way a retention team would have to run it:
 
-> **Status: phases 1 to 4 of 5 are complete** (honest benchmark, feature
-> selection, SHAP, tests, CI; a synthetic event log with point-in-time SQL
-> features; a simulated three-offer weekly loop with a randomised holdout, budgeted
-> uplift targeting and off-policy evaluation; MLflow registry with a gated,
-> committed production export, drift monitoring on a simulated year of batches, an
-> Airflow DAG validated in CI and a weekly GitHub Actions job). The build order and what each phase adds is in [Phases](#phases). The
-> 2023 version of this repository (one notebook and a Streamlit script that
-> retrained models on every click) is kept in `legacy/`.
+1. **A calibrated churn score**, from an honest eight-model benchmark (resampling
+   inside cross-validation, one untouched hold-out, calibration next to
+   discrimination), explained with SHAP at book, segment and customer level.
+2. **Event-level features in SQL, as of a date**, with a byte-equality test that
+   nothing from a customer's future leaks into their training row.
+3. **A weekly multi-offer targeting loop under a budget**: three offers, a
+   randomised exploration holdout, a multi-arm uplift learner, a Lagrangian
+   allocator, and off-policy evaluation reported with its power.
+4. **Production ownership**: an MLflow registry with a gated, committed promotion
+   path; drift monitoring over a simulated year of weekly batches; an Airflow DAG
+   validated in CI; a scheduled GitHub Actions job that commits reports and opens
+   issues.
+5. **An app for the people who own the offers**: score a customer and see why, build
+   this week's plan under a budget slider, read the monitoring.
+
+**Five-minute tour.** The [headline table](#headline-results-resultsheadline_phase1234json)
+has every number with its source. Figure 02 is the benchmark, figure 12 the policy
+comparison, figure 17 the drift heat map. [`docs/DECISIONS.md`](docs/DECISIONS.md)
+records the 24 choices and why; [`docs/SIMPLIFICATIONS.md`](docs/SIMPLIFICATIONS.md)
+lists what is simulated and what production would do instead; the six
+[learning notes](#12-learning-write-ups) build the intuition with worked examples
+and exercises. The app runs with `streamlit run app/streamlit_app.py`.
+
+> **Status: all five phases are built.** The build order and what each phase adds is
+> in [Phases](#phases). The 2023 version of this repository (one notebook and a
+> Streamlit script that retrained eight models on every click, quoting 87% accuracy
+> from SMOTE applied before the split) is kept in `legacy/`; what changed and why is
+> the rest of this page.
 >
 > **What is real and what is simulated.** The 7,043 customers, their contracts,
 > services, charges and churn labels are real (IBM's sample data). The monthly
@@ -64,12 +77,13 @@ effect durability on simulated data. The split is deliberate:
 4. [Phase 2: event-level features in SQL, as of a date](#4-phase-2-event-level-features-in-sql-as-of-a-date)
 5. [Phase 3: three offers, a weekly loop, uplift under a budget](#5-phase-3-three-offers-a-weekly-loop-uplift-under-a-budget)
 6. [Phase 4: owning the model in production](#6-phase-4-owning-the-model-in-production)
-7. [What I would tell marketing](#7-what-i-would-tell-marketing)
-8. [Phases](#phases)
-9. [How to run it](#9-how-to-run-it)
-10. [Repository layout](#10-repository-layout)
-11. [Learning write-ups](#11-learning-write-ups)
-12. [Limitations](#12-limitations)
+7. [Phase 5: the app for the people who own the offers](#7-phase-5-the-app-for-the-people-who-own-the-offers)
+8. [What I would tell marketing](#8-what-i-would-tell-marketing)
+9. [Phases](#phases)
+10. [How to run it](#10-how-to-run-it)
+11. [Repository layout](#11-repository-layout)
+12. [Learning write-ups](#12-learning-write-ups)
+13. [Limitations](#13-limitations)
 
 ## 1. The business problem
 
@@ -377,7 +391,33 @@ opens an issue when a week alerts, so the monitoring keeps moving without anyone
 hosting Airflow. What the monitors can and cannot see, with the arithmetic:
 [`docs/learn/06_drift_monitoring.md`](docs/learn/06_drift_monitoring.md).
 
-## 7. What I would tell marketing
+## 7. Phase 5: the app for the people who own the offers
+
+`streamlit run app/streamlit_app.py` ([`app/`](app/)). Three pages, all reading
+only what is committed to the repository (the production export, the snapshot, the
+results), so the same code runs on Streamlit Cloud from a clone with no registry
+server, event store or database.
+
+| Page | What it does | What it is built from |
+|---|---|---|
+| **Score a customer** | Pick one of the 1,409 hold-out customers (never used in training), describe a customer in a form, or upload a CSV. Shows the calibrated 4-week score, its multiple of the base rate, its percentile, and the SHAP reasons for *this* customer with the one-hot columns folded back to the raw features. | `models/production/`, `results/event_features_snapshot.parquet`, `churnprop.scoring`, `churnprop.explain` |
+| **This week's offer plan** | A budget slider and one assumed save rate per offer; the Lagrangian allocator picks one arm per customer within the budget. Spend, expected churners saved, expected value retained, λ, the plan by segment, the offer mix, the list, a CSV download. States plainly that this is the risk × value heuristic and that the learned uplift policy (phase 3) replaces it once outcomes mature. | `churnprop.uplift.allocate`, the hold-out book scored live |
+| **Monitoring** | The latest week's verdict and alerts, the year at a glance (figure 18), feature drift by week with a slider, every week's report, the registry table, the model card. | `results/monitoring/`, `results/registry.csv`, `models/production/model_card.json` |
+
+`tests/test_app.py` renders all three pages headless with Streamlit's `AppTest` and
+checks the plan respects the budget. The old app trained eight models on every click
+and applied SMOTE before the split; this one loads a promoted, gated export and says
+which version it is.
+
+**Deploying to Streamlit Cloud** (the only step that needs a login): sign in at
+[share.streamlit.io](https://share.streamlit.io) with GitHub, *Create app* → *Deploy
+a public app from GitHub*, repository `hrootscraft/telco-customer-churn`, branch
+`main`, main file path `app/streamlit_app.py`, Python 3.12 under *Advanced settings*.
+`requirements.txt` pins the library versions the committed model was trained with.
+The first boot takes a few minutes (it installs XGBoost, LightGBM and SHAP); after
+that, scoring the hold-out book is cached.
+
+## 8. What I would tell marketing
 
 1. **The model is ready to rank, and its probabilities can be trusted as
    probabilities.** The riskiest 10% of customers churn at 78%. A list of the top
@@ -401,9 +441,9 @@ hosting Airflow. What the monitors can and cannot see, with the arithmetic:
 | **2. Event-level features in SQL** | Synthetic monthly bills, payments, usage, tickets and plan changes behind each real customer; DuckDB SQL feature families computed *as of* a date; a point-in-time leakage test; optional Spark path; benchmark re-run with event features | **done** |
 | **3. Offers and the weekly loop** | Three offers plus control, responses planted on the real customers with sleeping dogs; a 12-week loop with an 8% randomised exploration holdout, cooldowns and matured outcomes; six policies on common random numbers with replays; multi-arm T/S-learner uplift; Lagrangian allocation under a weekly budget with an LP check; IPS/DR off-policy evaluation with its power calculation | **done** |
 | **4. Production** | MLflow registry with a gated, committed production export and rollback; weekly batches from hold-out customers with three injected drifts; PSI/KS, score, matured-outcome and uplift monitors with a retrain verdict; Airflow 3 DAG validated by `DagBag` in CI, Docker Compose for the UI; GitHub Actions weekly job that commits reports and opens issues | **done** |
-| 5. App and narrative | Three-page Streamlit app (score, this week's offer plan by segment, monitoring); learning notes; model card | next |
+| **5. App and narrative** | Three-page Streamlit app (score a customer with SHAP reasons, this week's offer plan under a budget slider, monitoring) tested headless with `AppTest`; `docs/SIMPLIFICATIONS.md`, `docs/model_card.md`, `docs/resume_bullets.md`; learning note 06; README rewritten around the honest numbers | **done** |
 
-## 9. How to run it
+## 10. How to run it
 
 ```bash
 python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
@@ -422,6 +462,7 @@ churnprop weekly --week 8    # phase 4: validate, score, monitor one week -> res
 churnprop production         # phase 4 end to end: train, gate, batches, 12 weekly runs, figures (~2 min)
 mlflow ui --backend-store-uri sqlite:///mlflow.db   # browse the registry
 docker compose -f docker/airflow/docker-compose.yml up   # Airflow UI with the weekly DAG
+streamlit run app/streamlit_app.py   # phase 5: the three-page app on http://localhost:8501
 make test                    # unit tests (~1 min)
 make test-all                # + end-to-end fast run
 ```
@@ -430,12 +471,14 @@ make test-all                # + end-to-end fast run
 segments); `configs/offers.yaml` holds the offer menu, planted responses, budget and
 loop settings. Results are deterministic for a given seed.
 
-## 10. Repository layout
+## 11. Repository layout
 
 ```
 configs/default.yaml        every tunable, commented
 configs/offers.yaml         offer menu, planted responses, budget, loop and learner settings
 models/production/          the promoted model, its card and monitoring reference (committed)
+app/                        Streamlit app: streamlit_app.py + views/{score,offers,monitoring}.py
+requirements.txt            what Streamlit Cloud installs (pinned to the model's library versions)
 dags/retention_weekly.py    Airflow DAG: ingest -> validate -> score+monitor -> branch -> retrain/publish
 docker/airflow/             Dockerfile + compose for the local Airflow UI
 .github/workflows/          ci.yml (tests, lint, DagBag) and weekly.yml (the scheduled weekly job)
@@ -476,15 +519,19 @@ src/churnprop/
 tests/                      data facts, leakage gate, SMOTE-in-pipeline, every model, stepwise, SHAP,
                             event consistency, point-in-time, e2e; allocator vs LP, OPE on
                             synthetic logs, learner recovers planted sign, loop invariants;
-                            PSI/KS, gate, registry round trip, drift injection, weekly job, DagBag
+                            PSI/KS, gate, registry round trip, drift injection, weekly job, DagBag,
+                            the app's three pages headless
 results/                    tables the README quotes; monitoring/ holds the weekly reports
 reports/figures/            figures 01-18
 docs/DECISIONS.md           D1-D24, the choices and why
+docs/SIMPLIFICATIONS.md     what is simulated, and what production would do instead
+docs/model_card.md          the production model's card, rendered from the committed JSON
+docs/resume_bullets.md      the claims this project supports, with sources
 docs/learn/                 learning notes with worked examples and exercises
-legacy/                     the 2023 notebook and Streamlit script, unchanged
+legacy/                     the 2023 notebook, Streamlit script and images, unchanged
 ```
 
-## 11. Learning write-ups
+## 12. Learning write-ups
 
 Each note is written to build intuition first, with worked examples and exercises
 (answers folded):
@@ -496,7 +543,7 @@ Each note is written to build intuition first, with worked examples and exercise
 5. [Spending a weekly budget, and finding out afterwards whether it worked](docs/learn/05_budget_allocation_and_ope.md)
 6. [Drift: what moves, what you can see, and when](docs/learn/06_drift_monitoring.md)
 
-## 12. Limitations
+## 13. Limitations
 
 * The event log is synthetic. Its consistency with the snapshot is enforced, but
   its churn signal is planted, so the +0.03 PR-AUC says the pipeline works, not what
