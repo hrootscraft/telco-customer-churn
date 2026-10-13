@@ -89,6 +89,6 @@ explain:
   n_customers_waterfall: 3
 
 events:                     # phase 2: synthetic event log behind each real customer (see D9)
-  months_after: 3           # months of events generated past the snapshot for non-churners
+  months_after: 7           # months of events past the snapshot for non-churners (covers a 26-week loop)
   signal: 0.15              # multiplies every planted churn effect in the last 3 months (0 = none); see D9
   price_rise_month: -4      # fibre bills rise 5% from this many months before the snapshot

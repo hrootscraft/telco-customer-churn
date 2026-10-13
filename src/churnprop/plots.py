@@ -281,3 +281,213 @@ def plot_event_feature_lift(comp: pd.DataFrame, out_dir: Path) -> Path:
     ax.grid(axis="y", visible=False)
     ax.legend(loc="lower right")
     return _save(fig, out_dir, "10_event_feature_lift.png")
+
+
+# ----------------------------------------------------------------------------- phase 3
+
+POLICY_LABEL = {
+    "no_offers": "No offers",
+    "random_outreach": "Random outreach",
+    "risk_top": "Highest churn risk",
+    "risk_value": "Risk × value, fixed save rate",
+    "uplift": "Learned uplift + budget",
+    "oracle": "Oracle (planted truth)",
+}
+POLICY_COLOR = {
+    "no_offers": "#9a9890",
+    "random_outreach": SERIES[1],
+    "risk_top": SERIES[3],
+    "risk_value": SERIES[4],
+    "uplift": SERIES[0],
+    "oracle": "#0d366b",
+}
+ARM_COLOR = {"bill_credit": SERIES[0], "tech_bundle": SERIES[2], "contract_upgrade": SERIES[6]}
+
+
+def plot_policy_comparison(comp: pd.DataFrame, n_weeks: int, out_dir: Path) -> Path:
+    """Expected net value per week (planted truth) per policy, with the realised replays."""
+    c = comp[comp["policy"] != "no_offers"].copy()
+    fig, ax = plt.subplots(figsize=(8.6, 3.9))
+    y = np.arange(len(c))
+    ax.barh(
+        y,
+        c["truth_reward_per_week"] / 1000,
+        color=[POLICY_COLOR[p] for p in c["policy"]],
+        height=0.58,
+        label="expected value under the planted responses",
+    )
+    if "realised_net_mean" in c and c["realised_net_mean"].notna().any():
+        ok = c["realised_net_mean"].notna()
+        ax.errorbar(
+            c.loc[ok, "realised_net_mean"] / n_weeks / 1000,
+            y[ok.to_numpy()],
+            xerr=c.loc[ok, "realised_net_sd"] / n_weeks / 1000,
+            fmt="o",
+            color=INK,
+            ms=5,
+            capsize=3,
+            lw=1.2,
+            label="realised, mean ± sd over replays of the coin flips",
+        )
+    for i, v in enumerate(c["truth_reward_per_week"] / 1000):
+        ax.text(
+            v + (0.6 if v >= 0 else -0.6),
+            i - 0.33,
+            f"${v:,.1f}k",
+            va="center",
+            ha="left" if v >= 0 else "right",
+            fontsize=8.5,
+            color=INK,
+        )
+    ax.axvline(0, color=INK2, lw=0.8)
+    ax.set_yticks(y, [POLICY_LABEL[p] for p in c["policy"]])
+    ax.invert_yaxis()
+    ax.set_xlabel("Net value of the week's offers vs doing nothing, $ thousands per week")
+    ax.set_title("Same budget, same customers, same draws: what each targeting rule earns")
+    ax.grid(axis="y", visible=False)
+    ax.legend(loc="upper right", fontsize=8.5)
+    lo = min(0, float(c["truth_reward_per_week"].min() / 1000)) - 6
+    ax.set_xlim(lo, float(c["truth_reward_per_week"].max() / 1000) * 1.3)
+    return _save(fig, out_dir, "12_policy_comparison.png")
+
+
+def plot_ope_power(comp: pd.DataFrame, out_dir: Path) -> Path:
+    """What the exploration holdout alone can say: DR estimate ± 95% CI against the truth."""
+    c = comp[comp["policy"].isin(["risk_value", "uplift", "oracle"])].copy()
+    c = c[c["dr_per_week"].notna()] if "dr_per_week" in c else c.iloc[0:0]
+    fig, ax = plt.subplots(figsize=(8.6, 3.2))
+    if len(c) == 0:
+        ax.text(0.5, 0.5, "not enough exploration rows", ha="center", transform=ax.transAxes)
+        return _save(fig, out_dir, "16_ope_power.png")
+    y = np.arange(len(c))
+    ax.errorbar(
+        c["dr_per_week"] / 1000,
+        y,
+        xerr=1.96 * c["dr_se_per_week"] / 1000,
+        fmt="o",
+        color=INK,
+        ms=6,
+        capsize=4,
+        lw=1.4,
+        label="doubly robust estimate from the holdout, 95% CI",
+    )
+    ax.scatter(
+        c["truth_per_week_same_weeks"] / 1000,
+        y,
+        marker="D",
+        s=48,
+        color=[POLICY_COLOR[p] for p in c["policy"]],
+        zorder=3,
+        label="planted truth, same weeks",
+    )
+    ax.axvline(0, color=INK2, lw=0.8)
+    ax.set_yticks(y, [POLICY_LABEL[p] for p in c["policy"]])
+    ax.invert_yaxis()
+    ax.set_xlabel("Net value vs doing nothing, $ thousands per week")
+    up = c[c["policy"] == "uplift"]
+    if len(up):
+        r = up.iloc[0]
+        ax.set_title(
+            "The holdout alone cannot see it yet: detectable effect ≈ "
+            f"\\${r['mde_per_week_80pct_power'] / 1000:,.0f}k/week against a true "
+            f"\\${r['truth_per_week_same_weeks'] / 1000:,.0f}k; "
+            f"~{r['weeks_to_detect_truth']:,.0f} weeks of logging to detect it",
+            fontsize=10,
+        )
+    ax.grid(axis="y", visible=False)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.3), ncol=2, frameon=False, fontsize=8.5)
+    return _save(fig, out_dir, "16_ope_power.png")
+
+
+def plot_learning_curve(weekly: pd.DataFrame, out_dir: Path) -> Path:
+    fig, ax = plt.subplots(figsize=(8.4, 3.8))
+    for pol in ("risk_top", "risk_value", "uplift", "oracle"):
+        w = weekly[weekly["policy"] == pol]
+        if len(w) == 0:
+            continue
+        ax.plot(
+            w["week"],
+            w["truth_reward"] / 1000,
+            color=POLICY_COLOR[pol],
+            lw=2,
+            marker="o",
+            ms=4,
+            label=POLICY_LABEL[pol],
+        )
+    up = weekly[(weekly["policy"] == "uplift") & (weekly["policy_used"] == "uplift")]
+    if len(up):
+        first = int(up["week"].min())
+        ax.axvline(first - 0.5, color=GRID, lw=1.2, ls="--")
+        ax.text(
+            first - 0.4,
+            ax.get_ylim()[1] * 0.62,
+            "uplift model takes over\n(first matured outcomes)",
+            fontsize=8.5,
+            color=INK2,
+            va="top",
+        )
+    ax.set_xlabel("Week")
+    ax.set_ylabel("Expected net value, \\$k per week")
+    ax.set_title(
+        "Week by week: the learned policy starts as risk × value and improves as outcomes mature"
+    )
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.22), ncol=4, frameon=False)
+    ax.set_xticks(sorted(weekly["week"].unique()))
+    return _save(fig, out_dir, "13_learning_curve.png")
+
+
+def plot_offer_mix(weekly_uplift: pd.DataFrame, arms: tuple[str, ...], out_dir: Path) -> Path:
+    fig, ax = plt.subplots(figsize=(8.4, 3.4))
+    bottom = np.zeros(len(weekly_uplift))
+    for k in arms[1:]:
+        v = weekly_uplift[f"n_{k}"].to_numpy()
+        ax.bar(
+            weekly_uplift["week"],
+            v,
+            bottom=bottom,
+            color=ARM_COLOR[k],
+            width=0.7,
+            label=k.replace("_", " "),
+            edgecolor=SURFACE,
+            linewidth=1.5,
+        )
+        bottom += v
+    ax.set_xlabel("Week")
+    ax.set_ylabel("Offers sent (policy + exploration)")
+    ax.set_title("Offer mix under the learned policy")
+    ax.legend(loc="upper right", ncol=3)
+    ax.set_xticks(weekly_uplift["week"])
+    ax.grid(axis="x", visible=False)
+    return _save(fig, out_dir, "14_offer_mix.png")
+
+
+def plot_budget_frontier(frontier: pd.DataFrame, budget: float, out_dir: Path) -> Path:
+    fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.6))
+    ax = axes[0]
+    ax.plot(
+        frontier["spend"] / 1000,
+        frontier["truth_reward"] / 1000,
+        color=BLUE_RAMP[5],
+        lw=2,
+        marker="o",
+        ms=4,
+    )
+    ax.axvline(budget / 1000, color=GRID, lw=1.2, ls="--")
+    ax.text(
+        budget / 1000 * 1.02,
+        ax.get_ylim()[0] + 1,
+        "configured weekly budget",
+        fontsize=8.5,
+        color=INK2,
+        rotation=90,
+        va="bottom",
+    )
+    ax.set_xlabel("Weekly spend, $k")
+    ax.set_ylabel("Expected net value, $k per week")
+    ax.set_title("Diminishing returns to budget (oracle allocation, week 1)")
+    ax = axes[1]
+    ax.plot(frontier["spend"] / 1000, frontier["lambda"], color=SERIES[1], lw=2, marker="o", ms=4)
+    ax.set_xlabel("Weekly spend, $k")
+    ax.set_ylabel("Lagrange multiplier λ (\\$ of value required per \\$ of cost)")
+    ax.set_title("The knob: λ falls as the budget loosens")
+    return _save(fig, out_dir, "15_budget_frontier.png")
