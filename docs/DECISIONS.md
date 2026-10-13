@@ -176,3 +176,85 @@ weeks of logging needed to detect the policy's true value; figure 16 shows it. T
 is the honest version of a finding every retention team meets: a small randomised
 holdout proves the programme is not harmful long before it measures its value, and
 the simulator's planted truth is what lets this repository say so with numbers.
+
+## Phase 4: the model in production
+
+**D19. Two stores for the model: MLflow for lineage, a committed export for
+serving.** Every `churnprop train` logs parameters, hold-out metrics, the data hash,
+the git commit, the pipeline and the monitoring reference statistics to an MLflow
+tracking server backed by a local SQLite file (`mlflow.db`, gitignored), and
+registers the version with the alias `candidate`. Promotion moves the `production`
+alias **and** writes the version to `models/production/` as plain files
+(`model.joblib`, `model_card.json`, `reference_stats.json`, `VERSION`) that are
+committed. Scoring, the Airflow DAG, the GitHub Actions job and the Streamlit app
+read only the export, so none of them needs a registry server, and the git history
+of `models/production/` is the deployment log. The alternative, a hosted registry
+every consumer talks to, is the right call for a team and the wrong one for a
+portfolio repository that must run from a clone.
+
+**D20. Promotion runs a gate, and the gate is a function with a test.** A
+candidate replaces production only if its hold-out PR-AUC is within 0.005 of
+production's and its ECE is at most 0.05 (`registry.gate`). The thresholds sit in
+`configs/default.yaml: production.gate`. `churnprop production` demonstrates it by
+training a second candidate without event features, which the gate refuses
+(hold-out PR-AUC 0.671 against production's 0.704); `--force` records a forced promotion
+on the card, and `promote --rollback` swaps the `production` and `previous` aliases
+and re-exports. The gate compares like with like: both numbers come from the same
+hold-out split, which is also why the training split is fixed by the config seed.
+
+**D21. Weekly batches are bootstrap samples of the book with drift injected on a
+schedule, and the schedule names three different kinds.** One snapshot cannot
+produce a year of cohorts, so each week is a 2,000-row resample with event features
+computed as of that week (phase 2's SQL at a later `{as_of}`). Three drifts are
+injected from the weeks named in `batches.drift`, chosen because they are caught by
+different monitors: a **price rise** on fibre (covariate shift: PSI/KS on `Monthly
+Charges` and on the score), an **acquisition mix shift** toward fibre (population
+drift: no row changes, the category shares do), and a **label shift** in the
+electronic-check month-to-month segment (concept drift: features identical, more
+churn). The third is invisible to every input monitor and surfaces only when the
+batch's labels mature four weeks later, which is the point of including it.
+
+**D22. Monitoring compares to reference statistics captured at training time, not
+to the training data.** `reference_stats` stores, per feature, the decile edges and
+proportions on the training frame, 21 quantiles with the reference ECDF at each (so
+the KS statistic is right for discrete features such as ticket counts, where many
+quantiles coincide), the category shares, the score histogram and the training churn
+rate. It travels with the model card. Thresholds: PSI 0.10 warn / 0.25 alert, KS
+0.15, score PSI 0.10, ECE 0.05, observed-vs-predicted churn ±30%, PR-AUC 0.05 below
+the card, and a realised-minus-predicted uplift gap of 0.04 on the loop's exploration
+rows. Any alert recommends a retrain; the DAG branches on it. These are the usual
+industry defaults, not tuned to the injected drift. On the simulated year they warn
+at week 5 (the price rise: `Monthly Charges` PSI 0.20, under the alert line, exactly
+as a 12% rise on 44% of rows should score), alert from week 8 (the mix shift stacks
+on the price rise and `Monthly Charges` crosses 0.25), and raise the outcome alert at
+week 11, four weeks after the label shift began (observed churn 0.294 vs predicted
+0.262 on batch 7, z = 3.3). There is also an unplanned true positive: `bill_shock`
+alerts at week 6 because the event generator's bills *after* the snapshot carry more
+noise than the ones before it, which are constrained to sum to `Total Charges`. The
+monitor found a seam in the simulator; it is left in, labelled, because that is what
+monitors are for and because fixing the generator would change the phase-2 and
+phase-3 numbers already reported. Batches are drawn from hold-out customers only
+(`batches.source: holdout`), so the matured-label PR-AUC is comparable to the model
+card rather than flattered by training rows.
+
+**D23. The Airflow DAG calls the same functions as the CLI, imports them inside the
+tasks, and is validated in CI with `DagBag`.** `dags/retention_weekly.py` is ingest →
+validate → score + monitor → branch → (retrain through the gate) → publish the offer
+plan, Mondays 06:00, one run at a time. Importing `churnprop` inside each task keeps
+the file parseable on a scheduler that has only Airflow, which is what the
+`airflow-dag` CI job is: Airflow 3.3 with its constraints file, `pytest
+tests/test_dag.py --noconftest`, asserting no import errors, the six task ids, the
+branch's two children and the `none_failed_min_one_success` trigger rule on the
+publish step. The local UI is `docker compose -f docker/airflow/docker-compose.yml
+up` (`airflow standalone` with the repo mounted). Airflow is not a dependency of the
+package.
+
+**D24. A GitHub Actions schedule runs the same weekly job so the monitoring keeps
+moving without anyone hosting Airflow.** `.github/workflows/weekly.yml` rebuilds the
+regenerable stores (`churnprop events`, `churnprop batches`), runs `churnprop weekly`
+for the week after the last one monitored (`results/monitoring/state.json`, wrapping
+around the simulated year), commits `results/monitoring/` and opens an issue when the
+week alerts. It is honest about what it is: a cron around the CLI, not an
+orchestrator; retries, backfills, task-level visibility and the retrain branch are
+why the DAG exists. Both exist so a reader can see the schedule run on GitHub and the
+orchestration logic in Airflow.

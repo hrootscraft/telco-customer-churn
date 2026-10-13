@@ -491,3 +491,169 @@ def plot_budget_frontier(frontier: pd.DataFrame, budget: float, out_dir: Path) -
     ax.set_ylabel("Lagrange multiplier λ (\\$ of value required per \\$ of cost)")
     ax.set_title("The knob: λ falls as the budget loosens")
     return _save(fig, out_dir, "15_budget_frontier.png")
+
+
+# ----------------------------------------------------------------------------- phase 4
+
+
+def plot_drift_heatmap(
+    psi: pd.DataFrame, summary: pd.DataFrame, cfg, out_dir: Path, top: int = 18
+) -> Path:
+    """PSI per feature (rows) and week (columns); the week's verdict along the top."""
+    from churnprop.batches import batches_config
+
+    mcfg = cfg.extra.get("monitoring", {})
+    order = psi.max().sort_values(ascending=False).index[:top]
+    M = psi[order].T
+    fig, ax = plt.subplots(figsize=(9.2, 0.34 * len(order) + 1.6))
+    im = ax.imshow(
+        M.to_numpy(float),
+        aspect="auto",
+        cmap=matplotlib.colors.LinearSegmentedColormap.from_list("b", BLUE_RAMP[1:]),
+        vmin=0,
+        vmax=max(0.3, float(np.nanmax(M.to_numpy()))),
+    )
+    ax.set_yticks(range(len(order)), order)
+    ax.set_xticks(range(M.shape[1]), [str(int(w)) for w in M.columns])
+    ax.set_xlabel("Batch week")
+    for i in range(M.shape[0]):
+        for j in range(M.shape[1]):
+            v = M.iat[i, j]
+            if v >= mcfg.get("psi_alert", 0.25):
+                ax.text(
+                    j,
+                    i,
+                    "!",
+                    ha="center",
+                    va="center",
+                    fontsize=9,
+                    color=SURFACE,
+                    fontweight="bold",
+                )
+    for k, r in enumerate(sorted(batches_config(cfg)["drift"], key=lambda r: r["from_week"])):
+        x = (
+            list(M.columns).index(r["from_week"]) - 0.5
+            if r["from_week"] in list(M.columns)
+            else None
+        )
+        if x is not None:
+            ax.axvline(x, color=SERIES[1], lw=1.4, ls="--")
+            # alternate heights so adjacent weeks' labels do not collide
+            ax.text(
+                x + 0.1,
+                -0.9 if k % 2 == 0 else -1.55,
+                r["kind"].replace("_", " "),
+                fontsize=8.5,
+                color=SERIES[1],
+                va="bottom",
+            )
+    st = summary.set_index("week")["status"]
+    for j, w in enumerate(M.columns):
+        s = st.get(int(w), "ok")
+        ax.text(
+            j,
+            len(order) - 0.2,
+            {"ok": "", "warn": "warn", "alert": "ALERT"}[s],
+            ha="center",
+            va="top",
+            fontsize=7.5,
+            color=SERIES[7] if s == "alert" else INK2,
+            transform=ax.transData,
+        )
+    ax.set_ylim(len(order) - 0.5 + 0.9, -0.5 - 1.9)
+    ax.grid(False)
+    cb = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.02)
+    cb.set_label("PSI vs training (! = above alert threshold)")
+    ax.set_title("Which inputs moved, and when: feature drift by week")
+    return _save(fig, out_dir, "17_drift_heatmap.png")
+
+
+def plot_monitoring_timeline(summary: pd.DataFrame, card: dict, cfg, out_dir: Path) -> Path:
+    mcfg = cfg.extra.get("monitoring", {})
+    fig, axes = plt.subplots(1, 3, figsize=(11.4, 3.5))
+    w = summary["week"]
+    ax = axes[0]
+    ax.plot(
+        w,
+        summary["max_feature_psi"],
+        color=SERIES[0],
+        lw=2,
+        marker="o",
+        ms=4,
+        label="worst feature PSI",
+    )
+    ax.plot(w, summary["score_psi"], color=SERIES[1], lw=2, marker="o", ms=4, label="score PSI")
+    ax.axhline(mcfg.get("psi_alert", 0.25), color=GRID, lw=1.2, ls="--")
+    ax.text(
+        w.max(),
+        mcfg.get("psi_alert", 0.25) + 0.01,
+        "feature alert",
+        fontsize=8,
+        color=INK2,
+        ha="right",
+    )
+    ax.axhline(mcfg.get("score_psi_alert", 0.10), color=GRID, lw=1.2, ls=":")
+    ax.text(
+        w.max(),
+        mcfg.get("score_psi_alert", 0.10) + 0.01,
+        "score alert",
+        fontsize=8,
+        color=INK2,
+        ha="right",
+    )
+    ax.set_title("Inputs and scores")
+    ax.set_xlabel("Batch week")
+    ax.set_xticks(sorted(w.unique()))
+    ax.legend(loc="center left", fontsize=8.5)
+    ax = axes[1]
+    m = summary["matured_batches"] > 0
+    ax.plot(
+        w[m],
+        summary.loc[m, "latest_predicted_churn"],
+        color=SERIES[0],
+        lw=2,
+        marker="o",
+        ms=4,
+        label="mean predicted",
+    )
+    ax.plot(
+        w[m],
+        summary.loc[m, "latest_observed_churn"],
+        color=SERIES[7],
+        lw=2,
+        marker="o",
+        ms=4,
+        label="observed (matured batch)",
+    )
+    ax.set_title("Outcomes, once labels mature")
+    ax.set_xlabel("Week the label arrives")
+    ax.set_ylabel("Churn rate in the matured batch")
+    ax.legend(loc="upper left", fontsize=8.5)
+    ax = axes[2]
+    ax.plot(
+        w[m],
+        summary.loc[m, "latest_pr_auc"],
+        color=SERIES[0],
+        lw=2,
+        marker="o",
+        ms=4,
+        label="PR-AUC on the matured batch",
+    )
+    ax.axhline(card["holdout"]["pr_auc"], color=GRID, lw=1.2, ls="--")
+    ax.text(
+        w.min(), card["holdout"]["pr_auc"] + 0.004, "model card hold-out", fontsize=8, color=INK2
+    )
+    ax.axhline(
+        card["holdout"]["pr_auc"] - mcfg.get("pr_auc_drop_alert", 0.05), color=GRID, lw=1.2, ls=":"
+    )
+    ax.set_title("Ranking quality")
+    ax.set_xlabel("Week the label arrives")
+    for a in axes:
+        for wk in summary.loc[summary["status"] == "alert", "week"]:
+            a.axvspan(wk - 0.5, wk + 0.5, color=SERIES[7], alpha=0.07, lw=0)
+    fig.suptitle(
+        "A simulated year of weekly monitoring (shaded weeks: alert, retrain recommended)",
+        fontsize=11,
+        y=1.04,
+    )
+    return _save(fig, out_dir, "18_monitoring_timeline.png")

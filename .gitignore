@@ -27,3 +27,5 @@ data/batches/
 .vscode/
 .idea/
 results/uplift_policy_log.parquet
+results/scores/
+results/plans/

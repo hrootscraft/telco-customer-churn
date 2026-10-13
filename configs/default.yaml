@@ -92,3 +92,50 @@ events:                     # phase 2: synthetic event log behind each real cust
   months_after: 7           # months of events past the snapshot for non-churners (covers a 26-week loop)
   signal: 0.15              # multiplies every planted churn effect in the last 3 months (0 = none); see D9
   price_rise_month: -4      # fibre bills rise 5% from this many months before the snapshot
+
+# ---------------------------------------------------------------------------
+# Phase 4: the model in production (D19-D24)
+# ---------------------------------------------------------------------------
+production:
+  model: xgboost                      # family from the zoo; trained on snapshot + event features
+  model_name: churnprop-propensity    # MLflow registered model
+  use_event_features: true
+  tracking_uri: sqlite:///mlflow.db   # relative to the repo root; gitignored
+  export_dir: models/production       # the promoted model, committed (D19)
+  outcome_weeks: 4                    # a batch's labels are available this many weeks later
+  gate:
+    min_pr_auc_delta: -0.005          # a candidate may not trail production by more than this on the hold-out
+    max_ece: 0.05
+
+batches:                              # weekly scoring cohorts simulated from the book (D21)
+  n_weeks: 12
+  size: 2000                          # bootstrap sample of customers per week
+  source: holdout                     # resample only customers the model never trained on (or: all)
+  drift:                              # injected so the monitors have something to catch; each names the week it starts
+    - from_week: 5
+      kind: price_rise
+      where: "`Internet Service` == 'Fiber optic'"
+      factor: 1.12
+      why: "fibre price rise: a covariate shift the model has never seen"
+    - from_week: 8
+      kind: mix_shift
+      where: "`Internet Service` == 'Fiber optic'"
+      weight: 1.8
+      why: "acquisition mix tilts to fibre: population drift without any row changing"
+    - from_week: 7
+      kind: label_shift
+      where: "`Payment Method` == 'Electronic check' and Contract == 'Month-to-month'"
+      flip_to_churn: 0.25
+      why: "a competitor campaign: churn rises in a segment with no feature change (concept drift)"
+
+monitoring:                           # thresholds (D22)
+  n_bins: 10
+  psi_warn: 0.10
+  psi_alert: 0.25
+  ks_alert: 0.15
+  score_psi_alert: 0.10
+  ece_alert: 0.05
+  churn_rate_rel_alert: 0.10          # observed vs predicted churn rate on matured batches (and z >= 3)
+  pr_auc_drop_alert: 0.05             # vs the model card's hold-out PR-AUC
+  uplift_gap_alert: 0.04              # realised minus predicted uplift on exploration rows, absolute
+  retrain_when: alert                 # any alert recommends a retrain (the DAG's branch)

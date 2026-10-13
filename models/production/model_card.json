@@ -1,0 +1,123 @@
+{
+  "model_name": "churnprop-propensity",
+  "family": "xgboost",
+  "family_pretty": "XGBoost",
+  "trained_at": "2026-10-13T03:55:04+00:00",
+  "git_sha": "96c4690",
+  "data_hash": "1bcbc0ccc9b35217",
+  "seed": 42,
+  "fast": false,
+  "n_train": 5634,
+  "n_test": 1409,
+  "train_churn_rate": 0.2653532126375577,
+  "features": [
+    "Tenure Months",
+    "Monthly Charges",
+    "Total Charges",
+    "n_addon_services",
+    "avg_monthly_charge",
+    "Gender",
+    "Senior Citizen",
+    "Partner",
+    "Dependents",
+    "Phone Service",
+    "Multiple Lines",
+    "Internet Service",
+    "Online Security",
+    "Online Backup",
+    "Device Protection",
+    "Tech Support",
+    "Streaming TV",
+    "Streaming Movies",
+    "Contract",
+    "Paperless Billing",
+    "Payment Method",
+    "tenure_band",
+    "n_bills_visible",
+    "last_bill_amount",
+    "avg_bill_prior_6m",
+    "bill_shock",
+    "late_payments_90d",
+    "late_days_90d",
+    "late_rate_365d",
+    "late_streak",
+    "usage_gb_last_month",
+    "usage_gb_last_3m",
+    "streaming_hours_last_3m",
+    "usage_trend_3m",
+    "tickets_90d",
+    "tickets_365d",
+    "network_tickets_90d",
+    "days_since_last_ticket",
+    "avg_csat_180d",
+    "avg_resolution_days_180d",
+    "days_since_last_plan_change",
+    "downgrades_180d",
+    "upgrades_180d",
+    "has_usage_history"
+  ],
+  "n_features": 44,
+  "event_features": true,
+  "holdout": {
+    "roc_auc": 0.8691015009429331,
+    "pr_auc": 0.7044628886838425,
+    "lift_top_decile": 2.9925285394622065,
+    "recall_at_precision": 0.893048128342246,
+    "f1": 0.6285714285714286,
+    "accuracy": 0.815471965933286,
+    "brier": 0.12637563325692974,
+    "log_loss": 0.3877725235350656,
+    "ece": 0.02250439556333884
+  },
+  "top_drivers": [
+    {
+      "feature": "Contract",
+      "share": 0.1764146089553833
+    },
+    {
+      "feature": "Dependents",
+      "share": 0.1071832999587059
+    },
+    {
+      "feature": "Tenure Months",
+      "share": 0.07887041568756104
+    },
+    {
+      "feature": "usage_trend_3m",
+      "share": 0.06829721480607986
+    },
+    {
+      "feature": "Online Security",
+      "share": 0.045656900852918625
+    },
+    {
+      "feature": "Internet Service",
+      "share": 0.045287542045116425
+    },
+    {
+      "feature": "Tech Support",
+      "share": 0.035058390349149704
+    },
+    {
+      "feature": "usage_gb_last_month",
+      "share": 0.034224119037389755
+    }
+  ],
+  "note": "phase 4 baseline: snapshot + event features",
+  "intended_use": "Rank active customers by 4-week churn risk for the weekly offer loop; the score is multiplied by CLTV in the decision layer, so calibration matters as much as ranking.",
+  "limitations": "Trained on the IBM snapshot plus a synthetic event log (D9). Event features are computed as of the scoring date; the model has not seen prices or mixes outside the training book, which the drift monitors watch for.",
+  "version": 1,
+  "run_id": "928b31607bd54404b6c8791f6906462a",
+  "gate": {
+    "promote": true,
+    "checks": {
+      "ece_ok": true,
+      "pr_auc_ok": true
+    },
+    "reasons": [],
+    "candidate": 1,
+    "production_before": null,
+    "forced": false
+  },
+  "exported_at": "2026-10-13T03:55:10+00:00"
+}

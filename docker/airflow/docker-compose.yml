@@ -1,0 +1,19 @@
+# Local Airflow UI for the retention_weekly DAG.
+#   docker compose -f docker/airflow/docker-compose.yml up --build
+# then open http://localhost:8080 (the admin password is printed in the container log,
+# or read it from the volume at /opt/airflow/simple_auth_manager_passwords.json.generated).
+services:
+  airflow:
+    build:
+      context: ../..
+      dockerfile: docker/airflow/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../..:/opt/repo            # live DAGs, configs, data, models and results
+      - airflow-home:/opt/airflow  # metadata DB, logs
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/repo/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+volumes:
+  airflow-home:

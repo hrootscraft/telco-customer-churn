@@ -149,6 +149,9 @@ class UpliftState:
         self.model: MultiArmUplift | None = None
         self.n_train = 0
         self.history: list[dict] = []
+        self.last_uplift: np.ndarray | None = (
+            None  # n × K predicted uplift this week, for monitoring
+        )
 
 
 def policy_arms(
@@ -201,6 +204,7 @@ def policy_arms(
             )
             info["policy_used"] = f"warm_start:{data.ocfg.warm_start_policy}"
             info["n_train"] = 0 if matured is None else int(len(matured))
+            state.last_uplift = None
             return arm, info
         # train on matured exploration rows, each with the features as of its own week
         parts = []
@@ -218,6 +222,7 @@ def policy_arms(
         )
         state.model, state.n_train = model, len(train)
         uplift = model.predict_uplift(data.features(week))  # reduction in 4-week churn prob
+        state.last_uplift = uplift
         ev = uplift * data.value[:, None] - costs[None, :]
         ev[:, 0] = 0
         ev[~eligible] = -1e12
@@ -327,6 +332,11 @@ def run_loop(policy: str, data: LoopData) -> LoopResult:
                     "explore": bool(explore[i]),
                     "intended_arm": int(intended[i]),
                     "p_oof": float(data.p_oof[i]),
+                    "pred_uplift": (
+                        float(state.last_uplift[i, assign[i]])
+                        if state.last_uplift is not None
+                        else np.nan
+                    ),
                     "value": float(data.value[i]),
                     "churned_window": False,
                     "matured": False,
