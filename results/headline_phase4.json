@@ -1,0 +1,186 @@
+{
+  "production_version": 1,
+  "production_holdout": {
+    "roc_auc": 0.8691015009429331,
+    "pr_auc": 0.7044628886838425,
+    "lift_top_decile": 2.9925285394622065,
+    "recall_at_precision": 0.893048128342246,
+    "f1": 0.6285714285714286,
+    "accuracy": 0.815471965933286,
+    "brier": 0.12637563325692974,
+    "log_loss": 0.3877725235350656,
+    "ece": 0.02250439556333884
+  },
+  "production_features": 44,
+  "gate_v1": {
+    "promote": true,
+    "checks": {
+      "ece_ok": true,
+      "pr_auc_ok": true
+    },
+    "reasons": [],
+    "candidate": 1,
+    "production_before": null,
+    "forced": false,
+    "production_after": 1
+  },
+  "gate_v2": {
+    "promote": false,
+    "checks": {
+      "ece_ok": true,
+      "pr_auc_ok": false,
+      "pr_auc_delta": -0.03389653414235683
+    },
+    "reasons": [
+      "PR-AUC 0.671 trails production v1 (0.704) by 0.034, more than 0.005"
+    ],
+    "candidate": 2,
+    "production_before": 1,
+    "forced": false
+  },
+  "candidate_v2_holdout": {
+    "roc_auc": 0.854604872251931,
+    "pr_auc": 0.6705663545414857,
+    "lift_top_decile": 2.939090529828953,
+    "recall_at_precision": 0.8689839572192514,
+    "f1": 0.592375366568915,
+    "accuracy": 0.8026969481902059,
+    "brier": 0.1330038989412272,
+    "log_loss": 0.4058928807702305,
+    "ece": 0.021726914776427665
+  },
+  "n_weeks": 12,
+  "drift_schedule": [
+    {
+      "from_week": 5,
+      "kind": "price_rise"
+    },
+    {
+      "from_week": 8,
+      "kind": "mix_shift"
+    },
+    {
+      "from_week": 7,
+      "kind": "label_shift"
+    }
+  ],
+  "first_alert_week": 6,
+  "retrain_weeks": [
+    6,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "weeks_status": [
+    {
+      "week": 1,
+      "status": "ok",
+      "top_feature": "Monthly Charges",
+      "max_feature_psi": 0.014,
+      "score_psi": 0.013
+    },
+    {
+      "week": 2,
+      "status": "ok",
+      "top_feature": "bill_shock",
+      "max_feature_psi": 0.013,
+      "score_psi": 0.016
+    },
+    {
+      "week": 3,
+      "status": "ok",
+      "top_feature": "Tenure Months",
+      "max_feature_psi": 0.017,
+      "score_psi": 0.01
+    },
+    {
+      "week": 4,
+      "status": "ok",
+      "top_feature": "Monthly Charges",
+      "max_feature_psi": 0.017,
+      "score_psi": 0.013
+    },
+    {
+      "week": 5,
+      "status": "warn",
+      "top_feature": "bill_shock",
+      "max_feature_psi": 0.2,
+      "score_psi": 0.008
+    },
+    {
+      "week": 6,
+      "status": "alert",
+      "top_feature": "bill_shock",
+      "max_feature_psi": 0.263,
+      "score_psi": 0.015
+    },
+    {
+      "week": 7,
+      "status": "warn",
+      "top_feature": "bill_shock",
+      "max_feature_psi": 0.232,
+      "score_psi": 0.006
+    },
+    {
+      "week": 8,
+      "status": "alert",
+      "top_feature": "Monthly Charges",
+      "max_feature_psi": 0.257,
+      "score_psi": 0.022
+    },
+    {
+      "week": 9,
+      "status": "alert",
+      "top_feature": "Monthly Charges",
+      "max_feature_psi": 0.253,
+      "score_psi": 0.017
+    },
+    {
+      "week": 10,
+      "status": "alert",
+      "top_feature": "Monthly Charges",
+      "max_feature_psi": 0.232,
+      "score_psi": 0.02
+    },
+    {
+      "week": 11,
+      "status": "alert",
+      "top_feature": "Monthly Charges",
+      "max_feature_psi": 0.208,
+      "score_psi": 0.021
+    },
+    {
+      "week": 12,
+      "status": "alert",
+      "top_feature": "Monthly Charges",
+      "max_feature_psi": 0.234,
+      "score_psi": 0.018
+    }
+  ],
+  "first_outcome_alert_week": 11,
+  "registry": [
+    {
+      "version": 1,
+      "aliases": "production",
+      "gate": "passed",
+      "git_sha": "96c4690",
+      "pr_auc": 0.7044628886838425,
+      "roc_auc": 0.8691015009429331,
+      "ece": 0.02250439556333884,
+      "created": "2026-10-13 03:55"
+    },
+    {
+      "version": 2,
+      "aliases": "candidate",
+      "gate": "rejected",
+      "git_sha": "96c4690",
+      "pr_auc": 0.6705663545414857,
+      "roc_auc": 0.854604872251931,
+      "ece": 0.021726914776427665,
+      "created": "2026-10-13 03:55"
+    }
+  ],
+  "fast": false
+}

@@ -27,6 +27,25 @@ def main(argv: list[str] | None = None) -> int:
             "benchmark-events",
             "phase 2: rerun four models with and without event features; writes results/ and figures",
         ),
+        (
+            "loop",
+            "phase 3: run every targeting policy through the weekly offer loop; writes results/ and figures",
+        ),
+        ("train", "phase 4: fit the production pipeline, log to MLflow, register as candidate"),
+        (
+            "promote",
+            "phase 4: gate the candidate against production, alias + export to models/production/",
+        ),
+        (
+            "batches",
+            "phase 4: simulate the weekly scoring batches with injected drift into data/batches/",
+        ),
+        ("score", "phase 4: score one weekly batch with the production model"),
+        (
+            "weekly",
+            "phase 4: the weekly job: validate, score, monitor one batch; writes results/monitoring/",
+        ),
+        ("production", "phase 4 end to end: train, gate, batches, 12 weekly runs, figures"),
     ]:
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("--config", default=None, help="YAML config (default configs/default.yaml)")
@@ -39,6 +58,31 @@ def main(argv: list[str] | None = None) -> int:
             "--engine", default="duckdb", choices=["duckdb", "spark"], help="features: SQL engine"
         )
         sp.add_argument("--force", action="store_true", help="events: regenerate even if present")
+        sp.add_argument(
+            "--offers", default=None, help="loop: offers YAML (default configs/offers.yaml)"
+        )
+        sp.add_argument(
+            "--n-customers", type=int, default=None, help="loop: subsample the book, for CI"
+        )
+        sp.add_argument("--week", default=None, help="score/weekly: batch week (1..n) or 'next'")
+        sp.add_argument("--version", type=int, default=None, help="promote: registry version")
+        sp.add_argument(
+            "--rollback", action="store_true", help="promote: swap production and previous"
+        )
+        sp.add_argument("--note", default="", help="train: free-text note for the model card")
+        sp.add_argument("--no-events", action="store_true", help="train: snapshot features only")
+        sp.add_argument(
+            "--explain", action="store_true", help="score: add top-3 SHAP reasons per row"
+        )
+        sp.add_argument(
+            "--uplift-log", default=None, help="weekly: loop log parquet for uplift drift"
+        )
+        sp.add_argument(
+            "--replicates",
+            type=int,
+            default=None,
+            help="loop: replays of the realised outcomes (default 5, 0 with --fast)",
+        )
     a = p.parse_args(argv)
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout
@@ -75,6 +119,72 @@ def main(argv: list[str] | None = None) -> int:
         out.parent.mkdir(parents=True, exist_ok=True)
         F.to_parquet(out, index=False)
         print(f"{len(F):,} customers x {F.shape[1] - 2} features as of {as_of.date()} -> {out}")
+        return 0
+    if a.command == "loop":
+        from churnprop.offers.menu import load_offers
+        from churnprop.pipeline_offers import run_phase3
+
+        reps = a.replicates if a.replicates is not None else (0 if a.fast else 5)
+        h = run_phase3(
+            cfg,
+            load_offers(a.offers),
+            a.out,
+            a.figures,
+            n_customers=a.n_customers,
+            n_replicates=reps,
+        )
+        for r in h["policies"]:
+            print(
+                f"{r['policy']:<16} net ${r['net_value']:>10,.0f}   truth ${r['truth_reward_per_week']:>8,.0f}/wk"
+            )
+        return 0
+    if a.command == "train":
+        from churnprop.registry import ProductionConfig, train_candidate
+
+        pcfg = ProductionConfig.from_config(cfg)
+        if a.no_events:
+            from dataclasses import replace
+
+            pcfg = replace(pcfg, use_event_features=False)
+        c = train_candidate(cfg, pcfg, note=a.note)
+        print(
+            f"candidate v{c.version}: PR-AUC {c.metrics['pr_auc']:.3f} ROC-AUC {c.metrics['roc_auc']:.3f} ECE {c.metrics['ece']:.3f}"
+        )
+        return 0
+    if a.command == "promote":
+        from churnprop.registry import promote, rollback
+
+        d = rollback(cfg) if a.rollback else promote(cfg, a.version, force=a.force)
+        print(d)
+        return 0 if a.rollback or d["promote"] or d.get("forced") else 2
+    if a.command == "batches":
+        from churnprop.batches import make_batches
+
+        paths = make_batches(cfg, force=a.force)
+        print(f"{len(paths)} weekly batches in {paths[0].parent}")
+        return 0
+    if a.command == "score":
+        from churnprop.scoring import score_batch
+
+        print(score_batch(cfg, int(a.week), explain=a.explain))
+        return 0
+    if a.command == "weekly":
+        from churnprop.pipeline_prod import next_week, run_week
+
+        week = next_week(cfg) if a.week in (None, "", "next") else int(a.week)
+        r = run_week(cfg, week, uplift_log_path=a.uplift_log)
+        print(
+            f"week {week}: {r['status'].upper()} retrain={r['retrain']} " + "; ".join(r["reasons"])
+        )
+        return 0
+    if a.command == "production":
+        from churnprop.pipeline_prod import run_phase4
+
+        h = run_phase4(cfg, a.out, a.figures)
+        print(
+            f"production v{h['production_version']} PR-AUC {h['production_holdout']['pr_auc']:.3f}; "
+            f"first alert week {h['first_alert_week']}; retrain weeks {h['retrain_weeks']}"
+        )
         return 0
     if a.command == "benchmark-events":
         from churnprop.pipeline_events import run_phase2

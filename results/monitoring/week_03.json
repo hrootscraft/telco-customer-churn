@@ -1,0 +1,459 @@
+{
+  "week": 3,
+  "n_scored": 2000,
+  "model_version": 1,
+  "status": "ok",
+  "statuses": {
+    "features": "ok",
+    "scores": "ok",
+    "uplift": "ok"
+  },
+  "retrain": false,
+  "reasons": [],
+  "features": [
+    {
+      "feature": "Tenure Months",
+      "kind": "numeric",
+      "psi": 0.01671697676166984,
+      "ks": 0.03247603833865814,
+      "mean_shift_sd": -0.027134057027602652,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "n_bills_visible",
+      "kind": "numeric",
+      "psi": 0.01671697676166984,
+      "ks": 0.03247603833865814,
+      "mean_shift_sd": -0.027134057027602652,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "usage_trend_3m",
+      "kind": "numeric",
+      "psi": 0.016087502146774773,
+      "ks": 0.032482250621228226,
+      "mean_shift_sd": -0.045809469985701845,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "Monthly Charges",
+      "kind": "numeric",
+      "psi": 0.015988657799122216,
+      "ks": 0.03339350372736949,
+      "mean_shift_sd": -0.022892022386298796,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "streaming_hours_last_3m",
+      "kind": "numeric",
+      "psi": 0.013990514395854045,
+      "ks": 0.050553248136315176,
+      "mean_shift_sd": -0.03448737347162584,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "bill_shock",
+      "kind": "numeric",
+      "psi": 0.011549712505010521,
+      "ks": 0.015088746893858751,
+      "mean_shift_sd": 5.4570068928544446e-05,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "Total Charges",
+      "kind": "numeric",
+      "psi": 0.010238362063892047,
+      "ks": 0.022964501242456525,
+      "mean_shift_sd": -0.03532560849437429,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "days_since_last_ticket",
+      "kind": "numeric",
+      "psi": 0.009526126265643076,
+      "ks": 0.024719027334043298,
+      "mean_shift_sd": -0.015857963438456222,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "tenure_band",
+      "kind": "categorical",
+      "psi": 0.008709000837136391,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "late_rate_365d",
+      "kind": "numeric",
+      "psi": 0.008309838185441173,
+      "ks": 0.018623358182463634,
+      "mean_shift_sd": 0.026346930617531798,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "days_since_last_plan_change",
+      "kind": "numeric",
+      "psi": 0.00827695405592305,
+      "ks": 0.028443734469293575,
+      "mean_shift_sd": 0.027597924759789054,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "n_addon_services",
+      "kind": "numeric",
+      "psi": 0.008130326618082408,
+      "ks": 0.025183173588924357,
+      "mean_shift_sd": -0.04801352178089235,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "avg_monthly_charge",
+      "kind": "numeric",
+      "psi": 0.008117109865109762,
+      "ks": 0.02501774937877177,
+      "mean_shift_sd": -0.02572723828530826,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "avg_bill_prior_6m",
+      "kind": "numeric",
+      "psi": 0.008041873236978973,
+      "ks": 0.03151774937877172,
+      "mean_shift_sd": -0.03047510355621618,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "avg_csat_180d",
+      "kind": "numeric",
+      "psi": 0.007652135439834382,
+      "ks": 0.017891196308129298,
+      "mean_shift_sd": 0.0407875518592681,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "last_bill_amount",
+      "kind": "numeric",
+      "psi": 0.007291189893400957,
+      "ks": 0.032088746893858766,
+      "mean_shift_sd": -0.02720346008368276,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "tickets_365d",
+      "kind": "numeric",
+      "psi": 0.006713397526601852,
+      "ks": 0.01907951721689749,
+      "mean_shift_sd": -0.00037894426332141777,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "usage_gb_last_3m",
+      "kind": "numeric",
+      "psi": 0.004847650938722283,
+      "ks": 0.027000000000000024,
+      "mean_shift_sd": -0.029537615050756773,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "usage_gb_last_month",
+      "kind": "numeric",
+      "psi": 0.004675610155421977,
+      "ks": 0.03394675186368479,
+      "mean_shift_sd": -0.027928705944211183,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "Multiple Lines",
+      "kind": "categorical",
+      "psi": 0.004482794731466056,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "late_days_90d",
+      "kind": "numeric",
+      "psi": 0.004415848806982064,
+      "ks": 0.014361732339368216,
+      "mean_shift_sd": -0.026118920388204365,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "Phone Service",
+      "kind": "categorical",
+      "psi": 0.004298647336827518,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "Streaming Movies",
+      "kind": "categorical",
+      "psi": 0.002297504815040731,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 1.1102230246251565e-16,
+      "status": "ok"
+    },
+    {
+      "feature": "Contract",
+      "kind": "categorical",
+      "psi": 0.0022097046289236907,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "Payment Method",
+      "kind": "categorical",
+      "psi": 0.002142770683197888,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "Streaming TV",
+      "kind": "categorical",
+      "psi": 0.00207674405129703,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 1.1102230246251565e-16,
+      "status": "ok"
+    },
+    {
+      "feature": "Device Protection",
+      "kind": "categorical",
+      "psi": 0.0010420250788474575,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "avg_resolution_days_180d",
+      "kind": "numeric",
+      "psi": 0.0009675658788004209,
+      "ks": 0.013989882854100077,
+      "mean_shift_sd": 0.012734890302664236,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "tickets_90d",
+      "kind": "numeric",
+      "psi": 0.0007125736369822135,
+      "ks": 0.015048633297834568,
+      "mean_shift_sd": -0.011995312038539149,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "Gender",
+      "kind": "categorical",
+      "psi": 0.0006930389204328602,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "Online Backup",
+      "kind": "categorical",
+      "psi": 0.0006614583767506317,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "Tech Support",
+      "kind": "categorical",
+      "psi": 0.0005912471103346884,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 1.1102230246251565e-16,
+      "status": "ok"
+    },
+    {
+      "feature": "Internet Service",
+      "kind": "categorical",
+      "psi": 0.0004072630303625414,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 1.1102230246251565e-16,
+      "status": "ok"
+    },
+    {
+      "feature": "Paperless Billing",
+      "kind": "categorical",
+      "psi": 0.00035672290955809173,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "Partner",
+      "kind": "categorical",
+      "psi": 0.00035257075477573927,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "Online Security",
+      "kind": "categorical",
+      "psi": 0.0002697361640465263,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 1.1102230246251565e-16,
+      "status": "ok"
+    },
+    {
+      "feature": "Dependents",
+      "kind": "categorical",
+      "psi": 7.180254596925108e-05,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "Senior Citizen",
+      "kind": "categorical",
+      "psi": 3.8745714893961556e-05,
+      "ks": NaN,
+      "mean_shift_sd": NaN,
+      "new_levels_share": 0.0,
+      "status": "ok"
+    },
+    {
+      "feature": "late_streak",
+      "kind": "numeric",
+      "psi": 2.8431218883327586e-05,
+      "ks": 0.002123003194888118,
+      "mean_shift_sd": 0.0058093508246738895,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "late_payments_90d",
+      "kind": "numeric",
+      "psi": 2.814951525689682e-06,
+      "ks": 0.0025012424565140634,
+      "mean_shift_sd": 0.0011839947297281436,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "network_tickets_90d",
+      "kind": "numeric",
+      "psi": 0.0,
+      "ks": 0.0031196308129215478,
+      "mean_shift_sd": 0.015541858140679288,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "downgrades_180d",
+      "kind": "numeric",
+      "psi": 0.0,
+      "ks": 0.01253123890663832,
+      "mean_shift_sd": -0.06332528301057189,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "upgrades_180d",
+      "kind": "numeric",
+      "psi": 0.0,
+      "ks": 0.012692403265885721,
+      "mean_shift_sd": -0.04590966024084546,
+      "new_levels_share": NaN,
+      "status": "ok"
+    },
+    {
+      "feature": "has_usage_history",
+      "kind": "numeric",
+      "psi": 0.0,
+      "ks": 0.0048125665601704,
+      "mean_shift_sd": -0.011691101074992171,
+      "new_levels_share": NaN,
+      "status": "ok"
+    }
+  ],
+  "top_drifted": [
+    {
+      "feature": "Tenure Months",
+      "psi": 0.01671697676166984,
+      "ks": 0.03247603833865814,
+      "status": "ok"
+    },
+    {
+      "feature": "n_bills_visible",
+      "psi": 0.01671697676166984,
+      "ks": 0.03247603833865814,
+      "status": "ok"
+    },
+    {
+      "feature": "usage_trend_3m",
+      "psi": 0.016087502146774773,
+      "ks": 0.032482250621228226,
+      "status": "ok"
+    },
+    {
+      "feature": "Monthly Charges",
+      "psi": 0.015988657799122216,
+      "ks": 0.03339350372736949,
+      "status": "ok"
+    },
+    {
+      "feature": "streaming_hours_last_3m",
+      "psi": 0.013990514395854045,
+      "ks": 0.050553248136315176,
+      "status": "ok"
+    }
+  ],
+  "scores": {
+    "score_psi": 0.010208613157924607,
+    "mean_score": 0.2632368423127919,
+    "ref_mean_score": 0.2652251124382019,
+    "mean_shift": -0.00198827012541003,
+    "status": "ok"
+  },
+  "outcomes": [],
+  "uplift": {
+    "status": "ok",
+    "n_rows": 0,
+    "arms": {},
+    "note": "not enough matured exploration rows with a prediction"
+  },
+  "batch_date": "2024-07-21",
+  "drift_injected": []
+}

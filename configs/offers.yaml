@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------------------
+# Phase 3: the offer menu, the planted responses, and the weekly loop.
+#
+# Everything about how customers *respond* to offers is invented here, because the
+# IBM data contains no treatment. The planted effects are relative reductions in
+# the 4-week churn hazard (0.30 = "30% less likely to churn in the window").
+# Negative values are sleeping dogs: the offer makes churn MORE likely.
+# See docs/DECISIONS.md D12-D16 for why each number.
+# ---------------------------------------------------------------------------
+
+horizon:
+  n_weeks: 12                 # decision weeks after the snapshot
+  outcome_weeks: 4            # an offer's outcome (churn or not) is observed this many weeks later
+  cooldown_weeks: 4           # a customer who received an offer is not eligible again for this long
+  baseline_4w_churn_mean: 0.08  # scales the out-of-fold propensity score into a 4-week hazard (D13)
+
+budget:
+  weekly: 32000               # dollars per week, exploration included (D14)
+  exploration_share: 0.08     # randomised holdout each week: uniform over control + offers (D15)
+
+value:
+  column: CLTV                # dollars lost when a customer churns (IBM's lifetime value)
+  margin: 1.0                 # multiply CLTV by this to get margin at stake
+
+offers:
+  bill_credit:
+    label: "$15/month bill credit for 3 months"
+    cost: 45
+    base: 0.08
+    rules:                    # additive relative effects; first match in each group applies
+      - {when: "`Monthly Charges` > 80", add: 0.25, why: "price-sensitive: high bill"}
+      - {when: "`Payment Method` == 'Electronic check'", add: 0.08, why: "manual payers notice the bill"}
+      - {when: "`Tenure Months` < 6", add: -0.28, why: "sleeping dog: new customers on promo read a credit as bait-and-switch"}
+      - {when: "Contract == 'Two year'", add: -0.30, why: "sleeping dog: contacting a locked-in customer reminds them to shop"}
+  tech_bundle:
+    label: "Free tech support + online security for 6 months"
+    cost: 60
+    base: 0.04
+    rules:
+      - {when: "`Internet Service` == 'Fiber optic' and (`Tech Support` != 'Yes' or `Online Security` != 'Yes')", add: 0.34, why: "fibre customers without support/security: the top SHAP drivers"}
+      - {when: "`Internet Service` == 'DSL' and `Tech Support` != 'Yes'", add: 0.12, why: "DSL without support"}
+      - {when: "tickets_90d >= 1", add: 0.10, why: "recent ticket: support is salient (event feature)"}
+      - {when: "`Internet Service` == 'No'", add: -0.04, why: "nothing to bundle; pure cost"}
+  contract_upgrade:
+    label: "One month free for moving to a one-year contract"
+    cost: 70
+    base: 0.03
+    rules:
+      - {when: "Contract == 'Month-to-month' and 6 <= `Tenure Months` <= 24", add: 0.32, why: "settled but uncommitted: the classic upgrade window"}
+      - {when: "Contract == 'Month-to-month' and 25 <= `Tenure Months` <= 48", add: 0.14, why: "longer tenure, smaller nudge"}
+      - {when: "Contract == 'Month-to-month' and `Tenure Months` < 6", add: -0.25, why: "sleeping dog: pressure to commit right after joining"}
+      - {when: "Contract != 'Month-to-month'", add: -0.03, why: "already on a contract; nothing to upgrade"}
+
+heterogeneity:
+  sd: 0.06                    # per customer x offer noise added to the planted effect
+  clip: [-0.6, 0.8]
+
+policies:                     # compared on identical potential outcomes and the same budget
+  - no_offers
+  - random_outreach           # bill credit to random eligible customers until the budget is spent
+  - risk_top                  # bill credit to the highest P(churn) until the budget is spent (resume bullet 2)
+  - risk_value                # rank by P(churn) x CLTV x assumed save rate - cost (the phase-1 plan's layer)
+  - uplift                    # learned multi-offer uplift + Lagrangian allocation (warm-started by risk_value)
+  - oracle                    # the planted truth, allocated the same way: the ceiling
+
+uplift:
+  learner: t                  # t (one outcome model per arm) or s (one model with the arm as a feature)
+  train_on: all               # all logged rows (policy + exploration) or exploration only; see D17
+  warm_start_policy: risk_value
+  min_training_rows: 300      # exploration rows with matured outcomes before the learner takes over
+  assumed_save_rate: 0.30     # for risk_value: the save rate it assumes for every customer
+  n_estimators: 200

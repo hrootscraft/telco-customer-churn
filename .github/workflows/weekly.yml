@@ -1,0 +1,70 @@
+name: weekly-retention
+
+# The same steps the Airflow DAG runs, on GitHub's scheduler, so the monitoring in
+# results/monitoring/ keeps moving without anyone hosting Airflow (D24). Each run
+# scores the next simulated batch week with the committed production model, runs the
+# drift monitors, commits the report, and opens an issue when a check alerts.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      week:
+        description: "Batch week 1-12 (blank = the week after the last one monitored)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: weekly-retention
+  cancel-in-progress: false
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e .
+      - name: Rebuild the regenerable stores (event log, batches)
+        run: |
+          churnprop events
+          churnprop batches
+      - name: Validate, score, monitor this week's batch
+        id: weekly
+        run: |
+          churnprop weekly --week "${{ github.event.inputs.week }}" | tee weekly.log
+          echo "week=$(jq -r .week results/monitoring/latest.json)" >> "$GITHUB_OUTPUT"
+          echo "status=$(jq -r .status results/monitoring/latest.json)" >> "$GITHUB_OUTPUT"
+          echo "retrain=$(jq -r .retrain results/monitoring/latest.json)" >> "$GITHUB_OUTPUT"
+      - name: Commit the monitoring report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add results/monitoring/
+          git diff --cached --quiet && echo "nothing to commit" && exit 0
+          git commit -m "monitoring: week ${{ steps.weekly.outputs.week }} (${{ steps.weekly.outputs.status }})"
+          git push
+      - name: Open an issue on alert
+        if: steps.weekly.outputs.status == 'alert'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Drift alert: batch week ${{ steps.weekly.outputs.week }} (retrain recommended: ${{ steps.weekly.outputs.retrain }})"
+          existing=$(gh issue list --search "\"$title\" in:title" --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then echo "issue #$existing already open"; exit 0; fi
+          gh issue create --title "$title" --label monitoring --body-file results/monitoring/latest.md || \
+          gh issue create --title "$title" --body-file results/monitoring/latest.md

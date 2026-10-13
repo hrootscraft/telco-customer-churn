@@ -13,9 +13,12 @@ as of a date, a weekly multi-offer targeting loop under a budget with a randomis
 exploration holdout, a model registry, drift monitoring, an Airflow DAG, and a
 Streamlit app for the people who own the offers.
 
-> **Status: phases 1 and 2 of 5 are complete** (honest benchmark, feature
-> selection, SHAP, tests, CI; then a synthetic event log with point-in-time SQL
-> features). The build order and what each phase adds is in [Phases](#phases). The
+> **Status: phases 1 to 4 of 5 are complete** (honest benchmark, feature
+> selection, SHAP, tests, CI; a synthetic event log with point-in-time SQL
+> features; a simulated three-offer weekly loop with a randomised holdout, budgeted
+> uplift targeting and off-policy evaluation; MLflow registry with a gated,
+> committed production export, drift monitoring on a simulated year of batches, an
+> Airflow DAG validated in CI and a weekly GitHub Actions job). The build order and what each phase adds is in [Phases](#phases). The
 > 2023 version of this repository (one notebook and a Streamlit script that
 > retrained models on every click) is kept in `legacy/`.
 >
@@ -23,8 +26,9 @@ Streamlit app for the people who own the offers.
 > services, charges and churn labels are real (IBM's sample data). The monthly
 > bills, payments, usage, tickets and plan changes behind each customer are
 > **synthetic**, generated to be consistent with each real row, with a small churn
-> signal planted and calibrated (D9). Offer responses in phase 3 will be synthetic
-> too. Every number below says which it is.
+> signal planted and calibrated (D9). How customers respond to the three offers in
+> phase 3 is synthetic too, planted from readable rules (D12). Every number below
+> says which it is.
 
 This is the operations-side companion to
 [revenue-tier-and-churn-experiment](https://github.com/hrootscraft/revenue-tier-and-churn-experiment)
@@ -32,7 +36,7 @@ This is the operations-side companion to
 effect durability on simulated data. The split is deliberate:
 [`docs/learn/03_propensity_vs_uplift.md`](docs/learn/03_propensity_vs_uplift.md).
 
-## Headline results (`results/headline_phase1.json`, `results/headline_phase2.json`)
+## Headline results (`results/headline_phase{1,2,3,4}.json`)
 
 | Question | Method | Result |
 |---|---|---|
@@ -45,6 +49,10 @@ effect durability on simulated data. The split is deliberate:
 | What drives the score? | SHAP on LightGBM, one-hot columns folded back | **Contract 24%** of total attention, Dependents 17%, Tenure 10%. Month-to-month contracts churn at **42.7%** vs 2.8% on two-year (not the 75% vs 3% in older write-ups) |
 | What do event-level features add, computed as of a date? | 461k synthetic events → 22 features in DuckDB SQL with an `{as_of}` filter; same split and folds | **+0.03 to +0.05 PR-AUC** on the hold-out for all four models (XGBoost 0.671 → 0.698, logistic 0.659 → 0.708); event features take 29% of SHAP attention, led by the 3-month usage trend. Lift is from a *planted* signal calibrated to be modest (D9) |
 | Does anything read the future? | Point-in-time test: edit every event after the as-of date, rebuild | **Feature table unchanged, byte for byte** (`tests/test_events.py::test_point_in_time`) |
+| Which offer, for whom, under a budget? | 12-week simulated loop, 8% randomised holdout, six policies on common random numbers | Learned uplift + Lagrangian allocation earns **$14.4k/week vs $6.8k** for risk × value over the second half, with 19% fewer offers and half the sleeping-dog share; oracle ceiling $47.0k/week. Responses are *planted* (D12) |
+| Which model is live, and should the new one replace it? | MLflow registry + gate + committed export | **v1 in production** (PR-AUC 0.704); a candidate without event features is **refused by the gate** (0.671) |
+| Does the model still fit this week's customers? | PSI/KS, score and matured-outcome monitors on 12 weekly batches with injected drift | Price rise **warns at week 5**, mix shift **alerts at week 8**, concept drift surfaces **at week 11** through outcomes (observed churn 0.294 vs 0.262, z = 3.3); score PSI never exceeds 0.02 |
+| Can the holdout prove it? | IPS / doubly robust OPE on the exploration rows, with power | **Not at 12 weeks**: DR interval ±$309.3k/week around a true $17.2k; ~5,928 weeks to detect (D18, figure 16) |
 
 <p align="center"><img src="reports/figures/02_benchmark.png" width="900"></p>
 
@@ -54,12 +62,14 @@ effect durability on simulated data. The split is deliberate:
 2. [The data, and the leakage trap in it](#2-the-data-and-the-leakage-trap-in-it)
 3. [Phase 1 results](#3-phase-1-results)
 4. [Phase 2: event-level features in SQL, as of a date](#4-phase-2-event-level-features-in-sql-as-of-a-date)
-5. [What I would tell marketing](#5-what-i-would-tell-marketing)
-6. [Phases](#phases)
-7. [How to run it](#7-how-to-run-it)
-8. [Repository layout](#8-repository-layout)
-9. [Learning write-ups](#9-learning-write-ups)
-10. [Limitations](#10-limitations)
+5. [Phase 3: three offers, a weekly loop, uplift under a budget](#5-phase-3-three-offers-a-weekly-loop-uplift-under-a-budget)
+6. [Phase 4: owning the model in production](#6-phase-4-owning-the-model-in-production)
+7. [What I would tell marketing](#7-what-i-would-tell-marketing)
+8. [Phases](#phases)
+9. [How to run it](#9-how-to-run-it)
+10. [Repository layout](#10-repository-layout)
+11. [Learning write-ups](#11-learning-write-ups)
+12. [Limitations](#12-limitations)
 
 ## 1. The business problem
 
@@ -215,7 +225,159 @@ is the check that matters. Why the lift is honest only as a statement about the
 pipeline, and what a real lift would need:
 [`docs/learn/04_point_in_time_features.md`](docs/learn/04_point_in_time_features.md).
 
-## 5. What I would tell marketing
+## 5. Phase 3: three offers, a weekly loop, uplift under a budget
+
+Phases 1–2 say *who* is likely to leave. A retention programme has to decide *who
+gets which offer this week* with a fixed budget, learn from what happened, and be
+able to prove afterwards that it worked. The IBM file has no treatment in it, so
+phase 3 **simulates how the real customers respond** to three offers (a $45 bill
+credit, a $60 tech-support bundle, a $70 contract-upgrade incentive) and runs the
+weekly loop a team would run. Everything about the responses is invented and
+written as readable rules in [`configs/offers.yaml`](configs/offers.yaml), including
+**sleeping dogs**: new customers who read a credit as bait-and-switch, two-year
+customers whom any contact reminds to shop (D12).
+
+**The loop** (`churnprop loop`, 12 weeks, `src/churnprop/loop.py`). Each week, the
+active book is scored; 8% of eligible customers go to a **randomised exploration
+holdout** (uniform over control and the three offers, probability logged); the
+policy spends the rest of a $32,000 budget; outcomes (churn within 4 weeks) mature
+four weeks later and are appended to the training log; a customer who got an arm is
+on cooldown for 4 weeks. Six policies run on **identical customers, budget and coin
+flips**, so the differences are the targeting rule's:
+
+| Policy | Expected net value, $/week (planted truth) | …second half of the horizon | Customers retained vs no offers (mean ± sd, 5 replays) | Share of offers sent to sleeping dogs | Offers sent |
+|---|---|---|---|---|---|
+| Random outreach (bill credit) | $-7.6k | $-9.3k | +21 ± 7 | 30% | 4,984 |
+| Highest churn risk (bill credit) | $11.7k | $7.2k | +57 ± 9 | 19% | 4,897 |
+| Risk × CLTV × assumed save rate − cost | $12.2k | $6.8k | +56 ± 9 | 18% | 4,891 |
+| **Learned multi-offer uplift + budget allocator** | $15.4k | $14.4k | +69 ± 17 | 15% | 3,961 |
+| Oracle: planted truth, same allocator | $47.0k | $36.4k | +131 ± 5 | 0% | 3,708 |
+
+<p align="center"><img src="reports/figures/12_policy_comparison.png" width="820"></p>
+
+How to read it. **Risk-ranked targeting earns money** ($11.7k a week on a ~5,000
+customer book) but one offer in five goes to a customer the offer pushes out, because
+"likely to churn" and "will respond to this offer" are different lists
+([learn note 03](docs/learn/03_propensity_vs_uplift.md)). The **uplift policy starts
+as the risk × value heuristic**, fits a T-learner (one LightGBM per arm, D17) in week
+5 when the first outcomes mature, and from then on chooses *which* offer and *whether
+to offer at all*: over the second half it earns **$14.4k a week against
+$6.8k** for the heuristic, sends 19% fewer offers, and halves the
+sleeping-dog share. It still captures only a third of the oracle, which knows every
+customer's true response: twelve weeks of an 8% holdout is a small amount of causal
+data, and the learning curve (figure 13) is still rising at week 12.
+
+**Budget allocation** (`uplift/allocate.py`). "One arm per customer, total cost ≤
+budget" is solved with a single Lagrange multiplier λ: every offer must clear
+`uplift × CLTV − cost − λ · cost > 0`, and bisection on λ hits the budget. The
+allocator is within 0.0% of the LP relaxation's bound (`lp_gap` in
+`headline_phase3.json`) and λ is a number finance can read: at a $10k budget the
+marginal offer returns $5.6 per $1 of cost beyond itself; at $80k, $0.37 (figure 15).
+
+**Off-policy evaluation, and why it is reported with its standard error.** The
+exploration rows let IPS and doubly robust estimators value any policy without
+running it (`uplift/ope.py`). Both are unbiased, and at 12 weeks both are useless:
+the reward is dollars × a rare churn event, so the DR 95% interval on the uplift
+policy's value is **±$309.3k a week around a true $17.2k**; the minimum effect
+this holdout could detect at 80% power is $441.8k a week, and detecting the
+policy's actual value would take on the order of 5,928 weeks of logging (figure 16,
+D18). That is the real finding of the phase for anyone who runs retention holdouts:
+a small randomised holdout proves a programme is not harmful long before it measures
+its value, which is why the simulator's planted truth is the yardstick here and why
+the learner trains on every logged row rather than the holdout alone (D17). What
+would fix it (a holdout concentrated where the policy acts, a churn-rate test with
+dollars reported descriptively, more weeks) is worked through with numbers in
+[`docs/learn/05_budget_allocation_and_ope.md`](docs/learn/05_budget_allocation_and_ope.md).
+
+<p align="center"><img src="reports/figures/13_learning_curve.png" width="820"></p>
+
+## 6. Phase 4: owning the model in production
+
+Phases 1–3 produce a model and a decision rule. Owning them means being able to say,
+every week, which version is live, whether this week's inputs look like the training
+data, whether last month's predictions came true, and what to do when they did not.
+
+**Registry and export (D19, D20).** `churnprop train` fits the production pipeline
+(XGBoost on snapshot + event features) and logs parameters, hold-out metrics, data
+hash, git commit, the pipeline and the monitoring reference statistics to **MLflow**
+(tracking + Model Registry on a local SQLite file), registering the version with the
+alias `candidate`. `churnprop promote` runs a **gate** (hold-out PR-AUC within 0.005
+of production, ECE ≤ 0.05), moves the `production` alias and exports the version to
+[`models/production/`](models/production/) as plain files, committed: `model.joblib`,
+[`model_card.json`](models/production/model_card.json), `reference_stats.json`. Every
+consumer (scoring, the DAG, the Actions job, the app) reads the export, so nothing
+needs an MLflow server, and the git log of that folder is the deployment history.
+`promote --rollback` swaps `production` and `previous`. The end-to-end run promotes
+**v1 (PR-AUC 0.704, ECE 0.023)** and then trains a deliberately weaker v2
+without event features, which the gate refuses (**0.671, trails by 0.034**;
+`results/registry.csv`).
+
+**Weekly batches with drift (D21).** `churnprop batches` writes twelve weekly cohorts:
+2,000-row resamples of the **hold-out customers** (so later label checks are honest)
+with event features computed as of each week, and three drifts injected on a schedule
+in [`configs/default.yaml`](configs/default.yaml): a 12% **price rise** on fibre from
+week 5 (covariate shift), an acquisition **mix shift** toward fibre from week 8
+(population drift), and a **label shift** in the electronic-check month-to-month
+segment from week 7 (concept drift: no feature changes, churn does).
+
+**Monitoring (D22).** `churnprop weekly --week N` validates the batch, scores it, and
+runs four checks against reference statistics captured at training time: per-feature
+PSI and KS (with the reference ECDF stored at the quantile grid so discrete features
+such as ticket counts do not false-alarm), score PSI and mean shift, and, once a
+batch's labels mature four weeks later, observed vs predicted churn (with a z-test),
+ECE and PR-AUC against the model card; plus realised-vs-predicted uplift on the
+phase-3 exploration rows when the loop log is present. Reports go to
+[`results/monitoring/`](results/monitoring/) as JSON and Markdown, with
+`summary.csv` and `latest.md` for the issue the Actions job opens.
+
+<p align="center"><img src="reports/figures/17_drift_heatmap.png" width="900"></p>
+
+| Week | Verdict | Retrain | Worst feature PSI | Score PSI | Observed / predicted churn (latest matured batch) | Drift injected |
+|---|---|---|---|---|---|---|
+| 1 | ok |  | Monthly Charges 0.01 | 0.01 |  |  |
+| 2 | ok |  | bill_shock 0.01 | 0.02 |  |  |
+| 3 | ok |  | Tenure Months 0.02 | 0.01 |  |  |
+| 4 | ok |  | Monthly Charges 0.02 | 0.01 |  |  |
+| 5 | warn |  | bill_shock 0.20 | 0.01 | 0.268 / 0.260 | price rise |
+| 6 | alert | yes | bill_shock 0.26 | 0.01 | 0.271 / 0.272 | price rise |
+| 7 | warn |  | bill_shock 0.23 | 0.01 | 0.258 / 0.263 | label shift, price rise |
+| 8 | alert | yes | Monthly Charges 0.26 | 0.02 | 0.264 / 0.262 | label shift, mix shift, price rise |
+| 9 | alert | yes | Monthly Charges 0.25 | 0.02 | 0.274 / 0.262 | label shift, mix shift, price rise |
+| 10 | alert | yes | Monthly Charges 0.23 | 0.02 | 0.269 / 0.261 | label shift, mix shift, price rise |
+| 11 | alert | yes | Monthly Charges 0.21 | 0.02 | 0.294 / 0.262 | label shift, mix shift, price rise |
+| 12 | alert | yes | Monthly Charges 0.23 | 0.02 | 0.328 / 0.296 | label shift, mix shift, price rise |
+
+How to read it. Weeks 1–4 are quiet (worst PSI < 0.02). The **price rise** at week 5
+moves `Monthly Charges` to PSI 0.20 and `bill_shock` further: a *warn*, as a 12% rise
+on 44% of rows should be, and the **score barely moves** (PSI 0.01): the model's view of
+those customers' risk hardly changed. The **mix shift** at week 8 stacks on it and
+`Monthly Charges` crosses the 0.25 alert line, and the mean score jumps from 0.262 to
+0.296 because the book now holds more fibre customers. The **label shift** that began at
+week 7 is invisible to every input check and surfaces at **week 11**, when batch 7's
+labels mature: observed churn 0.294 against predicted 0.262 (+12%, z = 3.3).
+That four-week lag is the honest cost of concept drift, and the reason the DAG's
+retrain is a branch on the monitors rather than a calendar. One alert was not
+planned: `bill_shock` at week 6 is the monitor catching a seam in the event generator
+(post-snapshot bills are noisier than the pre-snapshot ones constrained to sum to
+`Total Charges`), left in and labelled (D22).
+
+<p align="center"><img src="reports/figures/18_monitoring_timeline.png" width="900"></p>
+
+**Orchestration (D23, D24).** [`dags/retention_weekly.py`](dags/retention_weekly.py)
+is an Airflow 3 DAG, Mondays 06:00: `ingest_batch → validate → score_and_monitor →
+decide ⇢ (retrain through the gate) → publish_plan`, where the plan allocates this
+week's offers under the budget with the phase-3 allocator. The tasks call the same
+functions as the CLI and import them lazily, so the file parses on a bare scheduler;
+CI's `airflow-dag` job installs Airflow with its constraints file and runs
+`tests/test_dag.py` (`DagBag` import, task ids, branch edges, trigger rule). Run the
+UI locally with `docker compose -f docker/airflow/docker-compose.yml up`. Separately,
+[`.github/workflows/weekly.yml`](.github/workflows/weekly.yml) runs the same
+`churnprop weekly` step on GitHub's scheduler every Monday, commits the report and
+opens an issue when a week alerts, so the monitoring keeps moving without anyone
+hosting Airflow. What the monitors can and cannot see, with the arithmetic:
+[`docs/learn/06_drift_monitoring.md`](docs/learn/06_drift_monitoring.md).
+
+## 7. What I would tell marketing
 
 1. **The model is ready to rank, and its probabilities can be trusted as
    probabilities.** The riskiest 10% of customers churn at 78%. A list of the top
@@ -237,11 +399,11 @@ pipeline, and what a real lift would need:
 |---|---|---|
 | **1. Honest benchmark** | `src/churnprop` package, config, tests, CI; leakage gates; 8 models with resampling inside CV; calibration; stepwise/L1/permutation; SHAP at three altitudes | **done** |
 | **2. Event-level features in SQL** | Synthetic monthly bills, payments, usage, tickets and plan changes behind each real customer; DuckDB SQL feature families computed *as of* a date; a point-in-time leakage test; optional Spark path; benchmark re-run with event features | **done** |
-| 3. Offers and the weekly loop | Three offers with different costs plus control, responses simulated on the real customers; a 12-week loop with a 10% randomised exploration holdout; multi-treatment uplift; Lagrangian allocation under a weekly budget; off-policy evaluation | next |
-| 4. Production | MLflow registry with a committed production export; batch scoring CLI; PSI/KS, calibration and uplift drift monitoring with injected drift weeks; Airflow DAG (validated in CI) and a GitHub Actions weekly run of the same steps | |
-| 5. App and narrative | Three-page Streamlit app (score, this week's offer plan by segment, monitoring); learning notes; model card | |
+| **3. Offers and the weekly loop** | Three offers plus control, responses planted on the real customers with sleeping dogs; a 12-week loop with an 8% randomised exploration holdout, cooldowns and matured outcomes; six policies on common random numbers with replays; multi-arm T/S-learner uplift; Lagrangian allocation under a weekly budget with an LP check; IPS/DR off-policy evaluation with its power calculation | **done** |
+| **4. Production** | MLflow registry with a gated, committed production export and rollback; weekly batches from hold-out customers with three injected drifts; PSI/KS, score, matured-outcome and uplift monitors with a retrain verdict; Airflow 3 DAG validated by `DagBag` in CI, Docker Compose for the UI; GitHub Actions weekly job that commits reports and opens issues | **done** |
+| 5. App and narrative | Three-page Streamlit app (score, this week's offer plan by segment, monitoring); learning notes; model card | next |
 
-## 7. How to run it
+## 9. How to run it
 
 ```bash
 python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
@@ -252,19 +414,34 @@ churnprop benchmark --fast   # 3 folds, 100 trees, 10 epochs: ~2 min
 churnprop events             # phase 2: simulate the event log into data/events/ (~25 s)
 churnprop features --as-of 2024-03-31   # point-in-time features as of any date -> results/
 churnprop benchmark-events   # phase 2: four models with vs without event features (~3 min)
+churnprop loop               # phase 3: six policies through the 12-week loop + 5 replays (~4 min)
+churnprop loop --offers my_offers.yaml --replicates 0   # your own menu / budget / horizon
+churnprop train && churnprop promote   # phase 4: register a candidate, gate it, export models/production/
+churnprop batches            # phase 4: twelve weekly cohorts with injected drift -> data/batches/
+churnprop weekly --week 8    # phase 4: validate, score, monitor one week -> results/monitoring/
+churnprop production         # phase 4 end to end: train, gate, batches, 12 weekly runs, figures (~2 min)
+mlflow ui --backend-store-uri sqlite:///mlflow.db   # browse the registry
+docker compose -f docker/airflow/docker-compose.yml up   # Airflow UI with the weekly DAG
 make test                    # unit tests (~1 min)
 make test-all                # + end-to-end fast run
 ```
 
 `configs/default.yaml` holds every tunable (split, folds, regime, model list, SHAP
-segments). Results are deterministic for a given seed.
+segments); `configs/offers.yaml` holds the offer menu, planted responses, budget and
+loop settings. Results are deterministic for a given seed.
 
-## 8. Repository layout
+## 10. Repository layout
 
 ```
 configs/default.yaml        every tunable, commented
+configs/offers.yaml         offer menu, planted responses, budget, loop and learner settings
+models/production/          the promoted model, its card and monitoring reference (committed)
+dags/retention_weekly.py    Airflow DAG: ingest -> validate -> score+monitor -> branch -> retrain/publish
+docker/airflow/             Dockerfile + compose for the local Airflow UI
+.github/workflows/          ci.yml (tests, lint, DagBag) and weekly.yml (the scheduled weekly job)
 data/raw/                   the IBM xlsx (unchanged)
 data/events/                synthetic event log, Parquet by month (generated, gitignored)
+data/batches/               weekly scoring cohorts with injected drift (generated, gitignored)
 sql/                        one point-in-time feature family per file, parameter {as_of}
 src/churnprop/
   config.py                 YAML -> frozen dataclasses
@@ -273,6 +450,18 @@ src/churnprop/
   events/simulate.py        the event-log generator, consistent with each real row
   features_sql/build.py     runs sql/ through DuckDB (or Spark) as of a date
   pipeline_events.py        phase 2 end to end
+  offers/menu.py            typed view of offers.yaml
+  offers/simulate.py        planted responses: potential outcomes per customer x arm
+  uplift/learner.py         multi-arm T- and S-learner on LightGBM
+  uplift/allocate.py        Lagrangian budget allocation + LP bound
+  uplift/ope.py             IPS and doubly robust off-policy evaluation
+  loop.py                   the weekly loop: holdout, cooldown, maturation, six policies
+  pipeline_offers.py        phase 3 end to end, replays, budget frontier, power
+  registry.py               MLflow train/register, gate, promote, rollback, committed export
+  batches.py                weekly cohorts with scheduled drift; batch validation
+  scoring.py                batch scoring with the export, SHAP reasons per row
+  monitor.py                reference stats, PSI/KS, score, outcome and uplift drift, reports
+  pipeline_prod.py          the weekly job (run_week) and the phase-4 demonstration
   propensity/
     models.py               the 8-model zoo: prep -> [smote] -> clf pipelines
     nn.py                   PyTorch MLP as a scikit-learn estimator
@@ -282,17 +471,20 @@ src/churnprop/
   explain.py                SHAP: global, by segment, by customer
   plots.py                  all figures
   pipeline.py               phase 1 end to end
-  cli.py                    `churnprop benchmark | events | features | benchmark-events`
+  cli.py                    `churnprop benchmark | events | features | benchmark-events | loop |
+                             train | promote | batches | score | weekly | production`
 tests/                      data facts, leakage gate, SMOTE-in-pipeline, every model, stepwise, SHAP,
-                            event consistency, point-in-time, e2e
-results/                    tables the README quotes
-reports/figures/            figures 01-11
-docs/DECISIONS.md           D1-D8, the choices and why
+                            event consistency, point-in-time, e2e; allocator vs LP, OPE on
+                            synthetic logs, learner recovers planted sign, loop invariants;
+                            PSI/KS, gate, registry round trip, drift injection, weekly job, DagBag
+results/                    tables the README quotes; monitoring/ holds the weekly reports
+reports/figures/            figures 01-18
+docs/DECISIONS.md           D1-D24, the choices and why
 docs/learn/                 learning notes with worked examples and exercises
 legacy/                     the 2023 notebook and Streamlit script, unchanged
 ```
 
-## 9. Learning write-ups
+## 11. Learning write-ups
 
 Each note is written to build intuition first, with worked examples and exercises
 (answers folded):
@@ -301,20 +493,28 @@ Each note is written to build intuition first, with worked examples and exercise
 2. [SHAP at three altitudes](docs/learn/02_shap_three_altitudes.md)
 3. [Propensity is not uplift](docs/learn/03_propensity_vs_uplift.md)
 4. [Point-in-time features from an event log](docs/learn/04_point_in_time_features.md)
+5. [Spending a weekly budget, and finding out afterwards whether it worked](docs/learn/05_budget_allocation_and_ope.md)
+6. [Drift: what moves, what you can see, and when](docs/learn/06_drift_monitoring.md)
 
-## 10. Limitations
+## 12. Limitations
 
 * The event log is synthetic. Its consistency with the snapshot is enforced, but
   its churn signal is planted, so the +0.03 PR-AUC says the pipeline works, not what
   real events would add. Real bills and tickets would also carry seasonality,
   outages and re-engagement that the generator does not model.
 * No treatment: nothing in the file says what anyone was offered, so no causal claim
-  is made from it. Phase 3 simulates offer responses on the real customers and runs
-  the loop that would generate real treatment data.
+  is made from it. Phase 3's offer responses are planted rules (D12); the policy
+  comparison shows the loop, the learner, the allocator and the evaluation working
+  on a known truth, not what these offers would do to real customers. The 4-week
+  hazard is inflated to compress a year of learning into a quarter (D13).
 * The hold-out is 1,409 customers, so differences below ~0.01 ROC-AUC between models
   are noise; the README says "tie" where it is one.
 * Hyper-parameters are sensible defaults, not tuned; tuning would move the top six
   by less than their CV standard deviation.
+* The weekly batches are resamples of one snapshot, so the drift the monitors catch
+  is the drift that was injected (plus one seam in the event generator). The retrain
+  branch retrains on the same training split; a production version would add the
+  matured batches and hold out the most recent one (learn note 06, exercise 3).
 
 **References:** IBM Cognos Analytics sample data, *Telco customer churn*; Kaggle
 mirror by Blastchar. Methods: Chawla et al. 2002 (SMOTE); Lundberg & Lee 2017 (SHAP);
