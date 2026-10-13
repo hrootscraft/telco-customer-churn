@@ -21,7 +21,6 @@ from xgboost import XGBClassifier
 
 from churnprop.config import Config
 from churnprop.features import make_preprocessor
-from churnprop.propensity.nn import TorchMLPClassifier
 
 MODEL_NAMES = (
     "logistic",
@@ -122,6 +121,10 @@ def _estimator(name: str, cfg: Config, class_weight):
             voting="soft",
         )
     if name == "mlp":
+        from churnprop.propensity.nn import (
+            TorchMLPClassifier,
+        )  # torch only when the MLP is asked for
+
         return TorchMLPClassifier(epochs=epochs, random_state=seed)
     raise KeyError(f"unknown model {name!r}; choose from {MODEL_NAMES}")
 

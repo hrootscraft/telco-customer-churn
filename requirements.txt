@@ -1,0 +1,17 @@
+# Streamlit Cloud installs this file; the package itself is imported from src/ by the app.
+# Pinned to the versions the committed models/production/model.joblib was trained with.
+streamlit>=1.40
+numpy>=2.0
+pandas>=2.2
+scipy>=1.11
+scikit-learn==1.9.1
+imbalanced-learn==0.14.2
+xgboost==3.4.1
+lightgbm>=4.1
+shap>=0.44
+statsmodels>=0.14
+matplotlib>=3.7
+pyyaml>=6.0
+pyarrow>=14
+openpyxl>=3.1
+joblib>=1.3
