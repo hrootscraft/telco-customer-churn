@@ -92,6 +92,9 @@ def run_benchmark(
         n_splits=cfg.benchmark.n_folds, n_repeats=cfg.benchmark.n_repeats, random_state=cfg.seed
     )
     X, y = split.X_train, split.y_train
+    # Default to every column in the split, so extra (e.g. event) features are not silently
+    # dropped by a ColumnTransformer built from the config's feature list.
+    feature_cols = list(feature_cols or X.columns)
     rows: list[dict] = []
     for name in models:
         for regime in regimes:

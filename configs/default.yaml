@@ -87,3 +87,8 @@ explain:
   model: lightgbm           # tree model SHAP is computed on
   segments: [Contract, Internet Service, tenure_band, Payment Method]
   n_customers_waterfall: 3
+
+events:                     # phase 2: synthetic event log behind each real customer (see D9)
+  months_after: 3           # months of events generated past the snapshot for non-churners
+  signal: 0.15              # multiplies every planted churn effect in the last 3 months (0 = none); see D9
+  price_rise_month: -4      # fibre bills rise 5% from this many months before the snapshot

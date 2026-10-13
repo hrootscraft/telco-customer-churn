@@ -62,3 +62,39 @@ pushes risk up").
 `avg_monthly_charge`, `tenure_band`. Richer behavioural features come from the
 event log in phase 2, where they can be computed as of a date; snapshot-only
 features that encode the future would defeat that.
+
+## Phase 2: event log and point-in-time features
+
+**D9. The event log is synthetic, consistent with the snapshot, and its churn signal
+is planted and calibrated.** The IBM file has one row per customer, so bills,
+payments, usage, tickets and plan changes behind each row are invented by
+`churnprop.events.simulate`. Hard consistency rules: a customer with tenure *t* has
+exactly *t* monthly bills ending at the snapshot date and they sum to `Total Charges`;
+payment lateness follows the real payment method; ticket rates follow the real
+services. A churn signal (more late payments and tickets, falling usage, downgrades
+in the last three months) is planted and scaled by `events.signal`. The scale was
+chosen with the fast benchmark over 0.1 / 0.2 / 0.3: at 0.15 the event features add
+about 0.03 PR-AUC, which is the modest, believable range for behavioural features on
+top of a strong contract/tenure signal; 0.5 would have pushed PR-AUC to 0.87, which
+no reader should believe. The README says in its first paragraph that the events
+are synthetic and that the reported lift measures the pipeline recovering a planted
+signal, not what real telco events would add.
+
+**D10. Features are SQL, computed as of a date, with the date filter applied before
+any window or aggregate.** Each family lives in one `sql/*_features.sql` file with
+one parameter, `{as_of}`. The first CTE in every file filters its source table to
+events dated on or before the as-of date; everything downstream (row numbers,
+windows, 90/180/365-day sums) runs on that filtered set. That single discipline is
+the point-in-time rule. `tests/test_events.py::test_point_in_time` edits every event
+after the as-of date (amounts ×10, all late, zero usage, 400 injected tickets and
+downgrades) and asserts the feature table is byte-identical. DuckDB is the engine
+because it reads the hive-partitioned Parquet directly with no server; the same SQL
+runs through `spark.sql` behind `--engine spark` for the PySpark story without
+making Spark a dependency.
+
+**D11. Parquet partitioned by month, zstd, one row group per file.** A first version
+wrote one row group per customer (the per-customer frames survive `pd.concat` as
+Arrow chunks), which made 460k rows weigh 426 MB and a feature build take 50 s.
+`combine_chunks()` before writing takes that to 10 MB and 0.5 s. Kept here because it
+is the kind of thing a reviewer asks about and the kind of thing that silently ruins
+a production feature store.

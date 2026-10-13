@@ -57,8 +57,10 @@ def make_preprocessor(
 ) -> ColumnTransformer:
     """Scale numerics, one-hot categoricals (``drop='if_binary'`` keeps Yes/No to one column)."""
     cols = list(feature_cols or cfg.data.feature_cols)
-    num = [c for c in cols if c in cfg.data.all_numeric]
+    # Anything not declared categorical is numeric; this is what lets the phase 2 event
+    # features (all numeric, built in SQL) ride through the same transformer.
     cat = [c for c in cols if c in cfg.data.all_categorical]
+    num = [c for c in cols if c not in cat]
     num_tf = StandardScaler() if scale else "passthrough"
     return ColumnTransformer(
         [

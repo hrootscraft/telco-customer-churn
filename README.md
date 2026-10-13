@@ -13,10 +13,18 @@ as of a date, a weekly multi-offer targeting loop under a budget with a randomis
 exploration holdout, a model registry, drift monitoring, an Airflow DAG, and a
 Streamlit app for the people who own the offers.
 
-> **Status: phase 1 of 5 is complete** (data, honest benchmark, feature selection,
-> SHAP, tests, CI). The build order and what each phase adds is in
-> [Phases](#phases). The 2023 version of this repository (one notebook and a
-> Streamlit script that retrained models on every click) is kept in `legacy/`.
+> **Status: phases 1 and 2 of 5 are complete** (honest benchmark, feature
+> selection, SHAP, tests, CI; then a synthetic event log with point-in-time SQL
+> features). The build order and what each phase adds is in [Phases](#phases). The
+> 2023 version of this repository (one notebook and a Streamlit script that
+> retrained models on every click) is kept in `legacy/`.
+>
+> **What is real and what is simulated.** The 7,043 customers, their contracts,
+> services, charges and churn labels are real (IBM's sample data). The monthly
+> bills, payments, usage, tickets and plan changes behind each customer are
+> **synthetic**, generated to be consistent with each real row, with a small churn
+> signal planted and calibrated (D9). Offer responses in phase 3 will be synthetic
+> too. Every number below says which it is.
 
 This is the operations-side companion to
 [revenue-tier-and-churn-experiment](https://github.com/hrootscraft/revenue-tier-and-churn-experiment)
@@ -24,7 +32,7 @@ This is the operations-side companion to
 effect durability on simulated data. The split is deliberate:
 [`docs/learn/03_propensity_vs_uplift.md`](docs/learn/03_propensity_vs_uplift.md).
 
-## Headline results (phase 1; `results/headline_phase1.json`)
+## Headline results (`results/headline_phase1.json`, `results/headline_phase2.json`)
 
 | Question | Method | Result |
 |---|---|---|
@@ -35,6 +43,8 @@ effect durability on simulated data. The split is deliberate:
 | What about "87% accuracy"? | Accuracy @ 0.5 next to "nobody churns" | **80.3%** vs **73.5%** for predicting nobody churns. Accuracy is reported, not trusted (D4) |
 | Does backward stepwise help? | Logistic LR-test by feature block; L1; permutation importance | Keeps **12 of 22** features at ROC-AUC **0.861 vs 0.860**: a parsimony tool, not a performance lever (D5) |
 | What drives the score? | SHAP on LightGBM, one-hot columns folded back | **Contract 24%** of total attention, Dependents 17%, Tenure 10%. Month-to-month contracts churn at **42.7%** vs 2.8% on two-year (not the 75% vs 3% in older write-ups) |
+| What do event-level features add, computed as of a date? | 461k synthetic events → 22 features in DuckDB SQL with an `{as_of}` filter; same split and folds | **+0.03 to +0.05 PR-AUC** on the hold-out for all four models (XGBoost 0.671 → 0.698, logistic 0.659 → 0.708); event features take 29% of SHAP attention, led by the 3-month usage trend. Lift is from a *planted* signal calibrated to be modest (D9) |
+| Does anything read the future? | Point-in-time test: edit every event after the as-of date, rebuild | **Feature table unchanged, byte for byte** (`tests/test_events.py::test_point_in_time`) |
 
 <p align="center"><img src="reports/figures/02_benchmark.png" width="900"></p>
 
@@ -43,12 +53,13 @@ effect durability on simulated data. The split is deliberate:
 1. [The business problem](#1-the-business-problem)
 2. [The data, and the leakage trap in it](#2-the-data-and-the-leakage-trap-in-it)
 3. [Phase 1 results](#3-phase-1-results)
-4. [What I would tell marketing](#4-what-i-would-tell-marketing)
-5. [Phases](#phases)
-6. [How to run it](#6-how-to-run-it)
-7. [Repository layout](#7-repository-layout)
-8. [Learning write-ups](#8-learning-write-ups)
-9. [Limitations](#9-limitations)
+4. [Phase 2: event-level features in SQL, as of a date](#4-phase-2-event-level-features-in-sql-as-of-a-date)
+5. [What I would tell marketing](#5-what-i-would-tell-marketing)
+6. [Phases](#phases)
+7. [How to run it](#7-how-to-run-it)
+8. [Repository layout](#8-repository-layout)
+9. [Learning write-ups](#9-learning-write-ups)
+10. [Limitations](#10-limitations)
 
 ## 1. The business problem
 
@@ -152,7 +163,59 @@ price itself and missing online security push risk up; for DSL customers nearly
 everything pulls it down. `results/shap_by_segment.csv`, figures 08–09, and
 [`docs/learn/02_shap_three_altitudes.md`](docs/learn/02_shap_three_altitudes.md).
 
-## 4. What I would tell marketing
+## 4. Phase 2: event-level features in SQL, as of a date
+
+The snapshot has no time in it beyond tenure. Real retention models are built from
+event tables (bills, payments, tickets, usage) and the hard part of building them is
+not the SQL, it is making sure every feature is computed **as of the scoring date**
+so that nothing from the customer's future leaks into their training row.
+
+**The event log (synthetic).** `churnprop events` generates, behind each real
+customer, one bill per month of tenure ending at a snapshot date of 2024-06-30
+(summing to the real `Total Charges`), a payment with lateness driven by the real
+payment method, monthly usage for internet customers, support tickets whose rate
+follows the real services (fibre without tech support raises more), and occasional
+plan changes; non-churners get three more months past the snapshot so the
+point-in-time rule has something to catch. 461k rows, 10 MB of zstd Parquet
+partitioned by month (`data/events/`, regenerable, not committed). A churn signal is
+planted in the last three months (more late payments and tickets, falling usage,
+downgrades) at `events.signal: 0.15`, calibrated so the features add about 0.03
+PR-AUC (D9).
+
+**The features (SQL).** Four files in `sql/`, one per family, each with a single
+parameter `{as_of}`; the first CTE filters the source table to events on or before
+that date and every window and aggregate runs on the filtered set. DuckDB runs them
+straight off the Parquet partitions in 0.5 s; `--engine spark` runs the identical
+SQL through PySpark. 22 features: bill shock (last bill vs the prior 6-month
+average), late payments and late days in 90 days, late rate in a year, late streak,
+usage level and 3-month trend, tickets in 90 and 365 days, network tickets, days
+since last ticket, CSAT and resolution time, days since last plan change,
+downgrades and upgrades in 180 days.
+
+**The test.** `test_point_in_time` builds the table as of a date 45 days before the
+snapshot, then multiplies every later bill by 10, marks it late, zeroes later usage,
+injects 400 later tickets and downgrades, rebuilds, and asserts equality. A leak in
+any feature fails with its column name.
+
+<p align="center"><img src="reports/figures/10_event_feature_lift.png" width="760"></p>
+
+| Model | PR-AUC, snapshot | PR-AUC, + events | ROC-AUC, snapshot | ROC-AUC, + events | Lift @ top 10%, + events |
+|---|---|---|---|---|---|
+| Logistic regression | 0.659 | **0.708** | 0.852 | 0.871 | 3.05 |
+| LightGBM | 0.664 | 0.697 | 0.854 | 0.869 | 3.10 |
+| XGBoost | 0.671 | 0.698 | 0.855 | 0.872 | 3.05 |
+| Neural net | 0.649 | 0.694 | 0.853 | 0.869 | 3.07 |
+
+Hold-out, same split and folds as phase 1. The gain is largest for the linear model,
+which could not build "trend" or "streak" from the snapshot and now gets them
+pre-computed; the boosters already squeezed more from tenure and charges. Event
+features take 29% of SHAP attention (figure 11), led by the usage trend, usage level
+and late days, which is where the signal was planted; nothing unplanted lit up, which
+is the check that matters. Why the lift is honest only as a statement about the
+pipeline, and what a real lift would need:
+[`docs/learn/04_point_in_time_features.md`](docs/learn/04_point_in_time_features.md).
+
+## 5. What I would tell marketing
 
 1. **The model is ready to rank, and its probabilities can be trusted as
    probabilities.** The riskiest 10% of customers churn at 78%. A list of the top
@@ -173,19 +236,22 @@ everything pulls it down. `results/shap_by_segment.csv`, figures 08–09, and
 | Phase | Adds | Status |
 |---|---|---|
 | **1. Honest benchmark** | `src/churnprop` package, config, tests, CI; leakage gates; 8 models with resampling inside CV; calibration; stepwise/L1/permutation; SHAP at three altitudes | **done** |
-| 2. Event-level features in SQL | Synthetic monthly bills, payments, usage, tickets and plan changes behind each real customer; DuckDB SQL feature families computed *as of* a date; a point-in-time leakage test; optional Spark path; benchmark re-run with event features | next |
-| 3. Offers and the weekly loop | Three offers with different costs plus control, responses simulated on the real customers; a 12-week loop with a 10% randomised exploration holdout; multi-treatment uplift; Lagrangian allocation under a weekly budget; off-policy evaluation | |
+| **2. Event-level features in SQL** | Synthetic monthly bills, payments, usage, tickets and plan changes behind each real customer; DuckDB SQL feature families computed *as of* a date; a point-in-time leakage test; optional Spark path; benchmark re-run with event features | **done** |
+| 3. Offers and the weekly loop | Three offers with different costs plus control, responses simulated on the real customers; a 12-week loop with a 10% randomised exploration holdout; multi-treatment uplift; Lagrangian allocation under a weekly budget; off-policy evaluation | next |
 | 4. Production | MLflow registry with a committed production export; batch scoring CLI; PSI/KS, calibration and uplift drift monitoring with injected drift weeks; Airflow DAG (validated in CI) and a GitHub Actions weekly run of the same steps | |
 | 5. App and narrative | Three-page Streamlit app (score, this week's offer plan by segment, monitoring); learning notes; model card | |
 
-## 6. How to run it
+## 7. How to run it
 
 ```bash
 python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -e ".[dev]"
 
-churnprop benchmark          # full phase 1: ~10 min on 4 cores; writes results/ and reports/figures/
+churnprop benchmark          # phase 1: ~10 min on 4 cores; writes results/ and reports/figures/
 churnprop benchmark --fast   # 3 folds, 100 trees, 10 epochs: ~2 min
+churnprop events             # phase 2: simulate the event log into data/events/ (~25 s)
+churnprop features --as-of 2024-03-31   # point-in-time features as of any date -> results/
+churnprop benchmark-events   # phase 2: four models with vs without event features (~3 min)
 make test                    # unit tests (~1 min)
 make test-all                # + end-to-end fast run
 ```
@@ -193,15 +259,20 @@ make test-all                # + end-to-end fast run
 `configs/default.yaml` holds every tunable (split, folds, regime, model list, SHAP
 segments). Results are deterministic for a given seed.
 
-## 7. Repository layout
+## 8. Repository layout
 
 ```
 configs/default.yaml        every tunable, commented
 data/raw/                   the IBM xlsx (unchanged)
+data/events/                synthetic event log, Parquet by month (generated, gitignored)
+sql/                        one point-in-time feature family per file, parameter {as_of}
 src/churnprop/
   config.py                 YAML -> frozen dataclasses
   data.py                   load, clean, leakage gate, stratified split
   features.py               engineered columns, the shared ColumnTransformer
+  events/simulate.py        the event-log generator, consistent with each real row
+  features_sql/build.py     runs sql/ through DuckDB (or Spark) as of a date
+  pipeline_events.py        phase 2 end to end
   propensity/
     models.py               the 8-model zoo: prep -> [smote] -> clf pipelines
     nn.py                   PyTorch MLP as a scikit-learn estimator
@@ -211,16 +282,17 @@ src/churnprop/
   explain.py                SHAP: global, by segment, by customer
   plots.py                  all figures
   pipeline.py               phase 1 end to end
-  cli.py                    `churnprop benchmark`
-tests/                      data facts, leakage gate, SMOTE-in-pipeline, every model, stepwise, SHAP, e2e
+  cli.py                    `churnprop benchmark | events | features | benchmark-events`
+tests/                      data facts, leakage gate, SMOTE-in-pipeline, every model, stepwise, SHAP,
+                            event consistency, point-in-time, e2e
 results/                    tables the README quotes
-reports/figures/            figures 01-09
+reports/figures/            figures 01-11
 docs/DECISIONS.md           D1-D8, the choices and why
 docs/learn/                 learning notes with worked examples and exercises
 legacy/                     the 2023 notebook and Streamlit script, unchanged
 ```
 
-## 8. Learning write-ups
+## 9. Learning write-ups
 
 Each note is written to build intuition first, with worked examples and exercises
 (answers folded):
@@ -228,12 +300,14 @@ Each note is written to build intuition first, with worked examples and exercise
 1. [Class imbalance, SMOTE, and which metric to believe](docs/learn/01_imbalance_and_metrics.md)
 2. [SHAP at three altitudes](docs/learn/02_shap_three_altitudes.md)
 3. [Propensity is not uplift](docs/learn/03_propensity_vs_uplift.md)
+4. [Point-in-time features from an event log](docs/learn/04_point_in_time_features.md)
 
-## 9. Limitations
+## 10. Limitations
 
-* One snapshot, no time dimension: tenure is the only history. Phase 2 adds a
-  (synthetic, clearly labelled) event log so that features can be computed as of a
-  date.
+* The event log is synthetic. Its consistency with the snapshot is enforced, but
+  its churn signal is planted, so the +0.03 PR-AUC says the pipeline works, not what
+  real events would add. Real bills and tickets would also carry seasonality,
+  outages and re-engagement that the generator does not model.
 * No treatment: nothing in the file says what anyone was offered, so no causal claim
   is made from it. Phase 3 simulates offer responses on the real customers and runs
   the loop that would generate real treatment data.
