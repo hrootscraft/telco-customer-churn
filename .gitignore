@@ -1,1 +1,28 @@
-/my_venv
+# environments
+/my_venv111
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+
+# large or regenerable artefacts
+models/benchmark/
+mlruns/
+mlflow.db
+results/shap_values.parquet
+results/test_scores.csv
+results/benchmark_cv_folds.csv
+data/events/
+data/batches/
+
+# notebooks
+.ipynb_checkpoints/
+
+# os / editors
+.DS_Store
+.vscode/
+.idea/

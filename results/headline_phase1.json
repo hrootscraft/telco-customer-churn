@@ -1,0 +1,144 @@
+{
+  "n_customers": 7043,
+  "churn_rate": 0.2653698707936959,
+  "churn_by_contract": [
+    {
+      "Contract": "Month-to-month",
+      "churn_rate": 0.4270967741935484,
+      "churners": 1655,
+      "customers": 3875
+    },
+    {
+      "Contract": "One year",
+      "churn_rate": 0.11269517990495587,
+      "churners": 166,
+      "customers": 1473
+    },
+    {
+      "Contract": "Two year",
+      "churn_rate": 0.02831858407079646,
+      "churners": 48,
+      "customers": 1695
+    }
+  ],
+  "churn_by_internet": [
+    {
+      "Internet Service": "Fiber optic",
+      "churn_rate": 0.4189276485788114,
+      "churners": 1297,
+      "customers": 3096
+    },
+    {
+      "Internet Service": "DSL",
+      "churn_rate": 0.1895910780669145,
+      "churners": 459,
+      "customers": 2421
+    },
+    {
+      "Internet Service": "No",
+      "churn_rate": 0.07404980340760157,
+      "churners": 113,
+      "customers": 1526
+    }
+  ],
+  "churn_by_payment": [
+    {
+      "Payment Method": "Electronic check",
+      "churn_rate": 0.4528541226215645,
+      "churners": 1071,
+      "customers": 2365
+    },
+    {
+      "Payment Method": "Mailed check",
+      "churn_rate": 0.19106699751861042,
+      "churners": 308,
+      "customers": 1612
+    },
+    {
+      "Payment Method": "Bank transfer (automatic)",
+      "churn_rate": 0.16709844559585493,
+      "churners": 258,
+      "customers": 1544
+    },
+    {
+      "Payment Method": "Credit card (automatic)",
+      "churn_rate": 0.15243101182654403,
+      "churners": 232,
+      "customers": 1522
+    }
+  ],
+  "n_train": 5634,
+  "n_test": 1409,
+  "resampling": "none",
+  "best_model": "xgboost",
+  "best_model_pretty": "XGBoost",
+  "holdout": {
+    "roc_auc": 0.854604872251931,
+    "pr_auc": 0.6705663545414857,
+    "lift_top_decile": 2.939090529828953,
+    "recall_at_precision": 0.8689839572192514,
+    "accuracy": 0.8026969481902059,
+    "brier": 0.1330038989412272,
+    "ece": 0.021726914776427665
+  },
+  "nobody_churns_accuracy": 0.7345635202271115,
+  "models_ranked": [
+    "xgboost",
+    "lightgbm",
+    "ensemble",
+    "mlp",
+    "logistic",
+    "random_forest",
+    "knn",
+    "svm"
+  ],
+  "mlp_holdout": {
+    "roc_auc": 0.8526621715880028,
+    "pr_auc": 0.64851594168528,
+    "accuracy": 0.8005677785663591
+  },
+  "top_drivers": [
+    {
+      "feature": "Contract",
+      "share": 0.23921477680348607
+    },
+    {
+      "feature": "Dependents",
+      "share": 0.16969868049211828
+    },
+    {
+      "feature": "Tenure Months",
+      "share": 0.10135845559940863
+    },
+    {
+      "feature": "Online Security",
+      "share": 0.062114759183434586
+    },
+    {
+      "feature": "Total Charges",
+      "share": 0.05387150811013349
+    }
+  ],
+  "stepwise": {
+    "kept": [
+      "Tenure Months",
+      "Monthly Charges",
+      "Partner",
+      "Dependents",
+      "Multiple Lines",
+      "Internet Service",
+      "Streaming TV",
+      "Streaming Movies",
+      "Contract",
+      "Paperless Billing",
+      "Payment Method",
+      "tenure_band"
+    ],
+    "n_kept": 12,
+    "n_total": 22,
+    "cv_auc_full": 0.8600598751470899,
+    "cv_auc_stepwise": 0.8608104703692419
+  },
+  "fast": false,
+  "seed": 42
+}
