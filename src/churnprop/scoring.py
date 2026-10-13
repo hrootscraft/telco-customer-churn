@@ -41,9 +41,7 @@ def score_frame(
         {
             id_col: df[id_col].to_numpy(),
             "score": p,
-            "decile": (10 - pd.qcut(pd.Series(p).rank(method="first"), 10, labels=False)).astype(
-                int
-            ),
+            "decile": score_deciles(p),
             "model_version": model.version,
             "scored_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
@@ -53,6 +51,20 @@ def score_frame(
     if explain:
         out = pd.concat([out, top_reasons(X, model)], axis=1)
     return out
+
+
+def score_deciles(p: np.ndarray) -> pd.Series:
+    """Within-frame decile of each score, 1 = top 10%.
+
+    A decile is a rank among the rows scored together, so it needs at least ten of
+    them; with fewer (one customer described in the app, a tiny CSV) it is ``<NA>``
+    rather than a number that would read as a population rank.
+    """
+    n = len(p)
+    if n < 10:
+        return pd.Series([pd.NA] * n, dtype="Int64")
+    ranks = pd.Series(p).rank(method="first")
+    return (10 - pd.qcut(ranks, 10, labels=False)).astype("Int64")
 
 
 def top_reasons(X: pd.DataFrame, model: ProductionModel, k: int = 3) -> pd.DataFrame:

@@ -143,9 +143,9 @@ def render():
         row = book[book[c.data.id_col] == cid].head(1)
         _score_card(float(row["score"].iloc[0]), card)
         with st.expander("Customer details"):
-            show = row[list(c.data.feature_cols) + ["CLTV"]].T
+            show = row[list(c.data.feature_cols) + ["CLTV"]].T.astype(str)
             show.columns = ["value"]
-            st.dataframe(show, use_container_width=True)
+            st.dataframe(show, width="stretch")
         _explain_row(row)
         if int(row["Churn Value"].iloc[0]) == 1:
             st.caption(
@@ -230,9 +230,7 @@ def render():
             st.success(
                 f"Scored {len(out):,} rows with model v{m.version}. Mean score {C.pct(out['score'].mean())}."
             )
-            st.dataframe(
-                out.sort_values("score", ascending=False), use_container_width=True, height=420
-            )
+            st.dataframe(out.sort_values("score", ascending=False), width="stretch", height=420)
             buf = io.StringIO()
             out.to_csv(buf, index=False)
             st.download_button("Download scores (CSV)", buf.getvalue(), "scores.csv", "text/csv")

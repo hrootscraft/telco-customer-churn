@@ -139,7 +139,7 @@ def render():
                     "share_offered": "{:.0%}",
                 }
             ),
-            use_container_width=True,
+            width="stretch",
         )
     with right:
         st.subheader("Offer mix")
@@ -169,7 +169,7 @@ def render():
                 "expected_value": "${:,.0f}",
             }
         ),
-        use_container_width=True,
+        width="stretch",
         height=380,
     )
     buf = io.StringIO()
