@@ -6,7 +6,6 @@ Scored 2,000 customers. Retrain recommended: **no**.
 |---|---|
 | features | ok |
 | scores | ok |
-| uplift | ok |
 
 Most drifted features:
 

@@ -1,5 +1,5 @@
 week,batch_date,model_version,status,retrain,n_feature_alerts,max_feature_psi,top_feature,score_psi,mean_score,matured_batches,latest_observed_churn,latest_predicted_churn,latest_ece,latest_pr_auc,drift_injected,reasons
-1,2024-07-07,1,ok,False,0,0.0144905398888746,Monthly Charges,0.012602609997865,0.2599099212246074,0,,,,,,
+1,2024-07-07,1,ok,False,0,0.014490539888874623,Monthly Charges,0.012602609997865052,0.2599099212246074,0,,,,,,
 2,2024-07-14,1,ok,False,0,0.0129027948232887,bill_shock,0.0164403363393825,0.2723336280881485,0,,,,,,
 3,2024-07-21,1,ok,False,0,0.0167169767616698,Tenure Months,0.0102086131579246,0.2632368423127919,0,,,,,,
 4,2024-07-28,1,ok,False,0,0.0170035948866064,Monthly Charges,0.0128925896751108,0.2615879833088838,0,,,,,,
@@ -10,4 +10,4 @@ week,batch_date,model_version,status,retrain,n_feature_alerts,max_feature_psi,to
 9,2024-09-01,1,alert,True,1,0.2531034238126863,Monthly Charges,0.0174318283114883,0.2955617794440477,5,0.274,0.2618286571882781,0.0354475066132727,0.7138706287554569,label_shift|mix_shift|price_rise,"Monthly Charges: PSI 0.25, KS 0.20"
 10,2024-09-08,1,alert,True,1,0.2317035724656878,Monthly Charges,0.0197292824225744,0.2926150982450053,6,0.269,0.2612219085210235,0.0272565910554258,0.7060856682334649,label_shift|mix_shift|price_rise,"Monthly Charges: PSI 0.23, KS 0.20"
 11,2024-09-15,1,alert,True,1,0.2075071797372235,Monthly Charges,0.0208728757411003,0.2893784408874053,7,0.2945,0.2619967142782989,0.0400190235234913,0.704829915991387,label_shift|mix_shift|price_rise,"Monthly Charges: PSI 0.21, KS 0.19 ; batch 7: observed churn 0.294 vs predicted 0.262 (+12%, z=3.3)"
-12,2024-09-22,1,alert,True,1,0.23354086407021446,Monthly Charges,0.018176735398925285,0.28806407402371403,8,0.328,0.2964008396670688,0.040818672110093754,0.7457533308976678,label_shift|mix_shift|price_rise,"Monthly Charges: PSI 0.23, KS 0.19 ; batch 7: observed churn 0.294 vs predicted 0.262 (+12%, z=3.3) ; batch 8: observed churn 0.328 vs predicted 0.296 (+11%, z=3.1)"
+12,2024-09-22,1,alert,True,1,0.2335408640702144,Monthly Charges,0.0181767353989252,0.288064074023714,8,0.328,0.2964008396670688,0.0408186721100937,0.7457533308976678,label_shift|mix_shift|price_rise,"Monthly Charges: PSI 0.23, KS 0.19 ; batch 7: observed churn 0.294 vs predicted 0.262 (+12%, z=3.3) ; batch 8: observed churn 0.328 vs predicted 0.296 (+11%, z=3.1)"

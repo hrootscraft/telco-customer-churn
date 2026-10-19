@@ -5,8 +5,7 @@
   "status": "ok",
   "statuses": {
     "features": "ok",
-    "scores": "ok",
-    "uplift": "ok"
+    "scores": "ok"
   },
   "retrain": false,
   "reasons": [],
@@ -448,12 +447,7 @@
     "status": "ok"
   },
   "outcomes": [],
-  "uplift": {
-    "status": "ok",
-    "n_rows": 0,
-    "arms": {},
-    "note": "not enough matured exploration rows with a prediction"
-  },
+  "uplift": null,
   "batch_date": "2024-07-07",
   "drift_injected": []
 }
