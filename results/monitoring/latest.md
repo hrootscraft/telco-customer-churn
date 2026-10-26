@@ -1,4 +1,4 @@
-# Monitoring, week 1 (model v1): **OK**
+# Monitoring, week 2 (model v1): **OK**
 
 Scored 2,000 customers. Retrain recommended: **no**.
 
@@ -11,10 +11,10 @@ Most drifted features:
 
 | Feature | PSI | KS | Status |
 |---|---|---|---|
-| Monthly Charges | 0.014 | 0.020 | ok |
-| avg_csat_180d | 0.011 | 0.013 | ok |
-| bill_shock | 0.011 | 0.020 | ok |
-| Total Charges | 0.010 | 0.022 | ok |
-| Tenure Months | 0.009 | 0.025 | ok |
+| bill_shock | 0.013 | 0.019 | ok |
+| streaming_hours_last_3m | 0.013 | 0.029 | ok |
+| Total Charges | 0.011 | 0.035 | ok |
+| days_since_last_ticket | 0.011 | 0.022 | ok |
+| avg_bill_prior_6m | 0.009 | 0.025 | ok |
 
-Score PSI 0.013; mean score 0.265 at training, 0.260 now.
+Score PSI 0.016; mean score 0.265 at training, 0.272 now.
